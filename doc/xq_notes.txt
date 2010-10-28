@@ -1,0 +1,7 @@
+Places to change synonyms:
+scripts/basicFuns -- get_ids()
+scripts/fillTermCategory.sql -- fill_term_category()
+config/query_pgsql.xml -- searchTermLikeInLiterals
+
+In NIF web app:
+GraphUtils (3 or 4 matches)

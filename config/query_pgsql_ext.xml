@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<db_config type="PostgreSQL">
+	<query>
+	    <getDagLCA>
+	        select * from get_lca_in_dag(':1'::int[][], :2, :3, :4)
+	    </getDagLCA>
+	    <getDagPath>
+	        select * from get_dag_path(:1, :2, :3, :4, :5, :6, :7)
+	    </getDagPath>
+  		<getNeighborInByLabel>
+  		    select t.* from get_neighborhood(':1', ':2', ':3', :4, true, :5, :6, :7, :8, :9, true) t :10
+  		</getNeighborInByLabel>
+  		<getNeighborOutByLabel>
+  		    select t.* from get_neighborhood(':1', ':2', ':3', :4, true, :5, :6, :7, :8, :9, false) t :10
+  		</getNeighborOutByLabel>
+  		<getNeighborBothByLabel>
+  		    ${query.getNeighborInByLabel}
+  		    union all
+  		    ${query.getNeighborOutByLabel}
+  		</getNeighborBothByLabel>
+  		<getNeighborInByName>
+  		    select t.* from get_neighborhood(':1', ':2', ':3', :4, false, :5, :6, :7, :8, :9, true) t :10
+  		</getNeighborInByName>
+  		<getNeighborOutByName>
+  		    select t.* from get_neighborhood(':1', ':2', ':3', :4, false, :5, :6, :7, :8, :9, false) t :10
+  		</getNeighborOutByName>
+  		<getNeighborBothByName>
+  		    ${query.getNeighborInByName}
+  		    union all
+  		    ${query.getNeighborOutByName}
+  		</getNeighborBothByName>  		
+  		<getNeighborCountInByLabel>
+  		    select get_neighbor_count(':1', ':2', :3, true, :4, :5, :6, :7, true)
+  		</getNeighborCountInByLabel>
+  		<getNeighborCountOutByLabel>
+  		    select get_neighbor_count(':1', ':2', :3, true, :4, :5, :6, :7, false)
+  		</getNeighborCountOutByLabel>
+  		<getNeighborCountBothByLabel>
+  		    select get_neighbor_count(':1', ':2', :3, true, :4, :5, :6, :7, true)
+  		    + get_neighbor_count(':1', ':2', :3, true, :4, :5, :6, :7, false)
+  		</getNeighborCountBothByLabel>
+  		<getNeighborCountInByID>
+            select sum(cnt) from (select get_neighbor_count(:1, :2, p.id, :3, :4, :5, true) as cnt 
+            from property p where p.name in (:6) and p.kbid = :7) t where t.cnt > 0
+  		</getNeighborCountInByID>
+  		<getNeighborCountOutByID>
+            select sum(cnt) from (select get_neighbor_count(:1, :2, p.id, :3, :4, :5, false) as cnt 
+            from property p where p.name in (:6) and p.kbid = :7) t where t.cnt > 0
+  		</getNeighborCountOutByID>
+  		<getNeighborCountBothByID>
+  		    select sum(cnt) from (select get_neighbor_count(:1, :2, p.id, :3, :4, :5, true) + 
+  		    get_neighbor_count(:1, :2, p.id, :3, :4, :5, false) as cnt 
+            from property p where p.name in (:6) and p.kbid = :7) t where t.cnt > 0
+  		</getNeighborCountBothByID>
+  		<getNeighborInByIDArray>
+  		    select t.* from get_neighborhood('{:1}'::integer[][], ':2', ':3', :4, true, :5, :6, :7, :8, true) t :9
+  		</getNeighborInByIDArray>
+  		<getNeighborOutByIDArray>
+  		    select t.* from get_neighborhood('{:1}'::integer[][], ':2', ':3', :4, true, :5, :6, :7, :8, false) t :9
+  		</getNeighborOutByIDArray>
+  		<getNeighborBothByIDArray>
+  		    ${query.getNeighborInByIDArray}
+  		    union all
+  		    ${query.getNeighborOutByIDArray}
+  		</getNeighborBothByIDArray>
+  		<searchIdNameLike>
+			select rid, rtid, browsertext from (:0) t1 :6 order by d limit :7;	
+  		</searchIdNameLike>
+  		<!-- Explanation:
+  		     * :1 - the query string in lower case. 
+  		     * :2 - condition on kb. See explanation at bottom of the file.
+  		     * :3 - if the query string contains special characters ('%', '_'), the value is E. Empty string otherwise.
+  		     * :4 - original query string.
+  		     * :5 - "NOT" or ""
+  		 -->
+  		<searchIdNameLikeInClasses>
+  		    select id as rid, 1 as rtid, browsertext, editdistance(':4', browsertext) as d from primitiveclass where lower(browsertext) :5 like :3':1%' and is_system = false :2
+  		</searchIdNameLikeInClasses>
+  		<searchIdNameLikeInInstances>
+  		    select id as rid, 12 as rtid, browsertext, editdistance(':4', browsertext) as d from individual where lower(browsertext) :5 like :3':1%'
+  		</searchIdNameLikeInInstances>
+  		<searchIdNameLikeInProperties>
+  		    select id as rid, 15 as rtid, browsertext, editdistance(':4', browsertext) as d from property where lower(browsertext) :5 like :3':1%' and is_system = false :2
+  		</searchIdNameLikeInProperties>
+  		<searchIdNameLikeInLiterals>
+  		    select id as rid, 13 as rtid, lexicalform as browsertext, editdistance(':4', lexicalform) as d from literal where lower(lexicalform) :5 like :3':1%' :2
+  		</searchIdNameLikeInLiterals>
+  		<getURLByIDs>
+  			select rid, rtid, get_ontology(rid, rtid) from (select ('{:1}'::integer[][])[i][1] as rid, ('{:1}'::integer[][])[i][2] as rtid 
+  			from generate_series(1, :2) i) a;  		
+  		</getURLByIDs>
+  		<checkInferredDefByIDs>
+  			select * from has_inferred_def('{:1}'::integer[][])
+  		</checkInferredDefByIDs>
+  		<checkInferredDefByTerms>
+  			select * from has_inferred_def(':1', true, :2, array[:3])
+  		</checkInferredDefByTerms>
+	</query>
+</db_config>

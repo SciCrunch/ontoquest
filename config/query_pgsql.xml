@@ -1,0 +1,158 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<db_config type="PostgreSQL">
+	<query>
+	    <checkRID>select 1 from :1 where id = :2</checkRID>
+  		<getKbIDByName>select id from kb where name = :1</getKbIDByName>
+  		<getNameByID>select get_name(:1, :2, false, null)</getNameByID>
+  		<getNamesByIDArray>select * from get_names('{:1}'::integer[][], false, null::text[])</getNamesByIDArray>
+  		<getLabelByID>select get_name(:1, :2, true, null)</getLabelByID>
+  		<getLabelsByIDArray>select * from get_names('{:1}'::integer[][], true, null::text[])</getLabelsByIDArray>
+  		<getIDs>select get_id(':1', :2, :3, :4)</getIDs>
+  		<getPropertyValue>
+  		    select get_name(n.rid, n.rtid, true, null) from graph_edges r, graph_nodes n, property p 
+  		      where r.rid1 = :1 and r.rtid1 = :2 and pid = p.id 
+  		      and r.rid2 = n.rid and r.rtid2 = n.rtid and p.name = ':3' and r.hidden = false;
+  		</getPropertyValue>
+  		<getResourceTypes>select id, name, rtype from resourcetype</getResourceTypes>
+  		<listKB>
+  		    select id, name from kb
+  		</listKB>
+  		<listRoot>
+  		    select * from get_root(:1, :2, :3)
+  		</listRoot>
+  		<!-- scan all relationships 
+  		     * :1: condition on kb. See explanation at bottom of the file. 
+  		-->
+  		<scanRelationships>
+  		    select rid1, rtid1, rid2, rtid2, pid from graph_edges where :1 and hidden = false
+  		</scanRelationships>
+  		<scanRelationshipsWithWeight>
+  		    select rid1, rtid1, rid2, rtid2, pid, weight from graph_edges_all r, rel_weight w where r.oid = w.rel_oid and r.rtid1 != 13 and r.rtid2 != 13 :1
+  		</scanRelationshipsWithWeight>
+  		<scanClassRelationships>
+<!-- 		    select classid1, rtid1, classid2, rtid2, p.id from disjointclass dc, property p 
+		      where p.name = 'disjointWith' and dc.kbid = :1 and p.kbid = :1
+		    union
+		    select classid1, class_rtid1, classid2, class_rtid2, p.id from equivalentclass ec, property p 
+		      where p.name = 'equivalentClass' and ec.kbid = :1 and p.kbid = :1
+		    union
+		    select childid, child_rtid, parentid, parent_rtid, p.id from subclassof sc, property p 
+		      where p.name = 'subClassOf' and sc.kbid = :1 and p.kbid = :1
+-->
+          select rid1, rtid1, rid2, rtid2, pid from graph_edges r where r.kbid = :1 and 
+          r.hidden = false and rtid1 in (1,2,3,4,5,6,7,8,9) and rtid2 in (1,2,3,4,5,6,7,8,9)
+		</scanClassRelationships>
+		<scanPropertyRelationships>
+		<!-- 
+		    select propertyid1, rt.id, propertyid2, rt.id, p.id from inversepropertyof ip, property p, resourcetype rt 
+		      where p.name = 'inverseOf' and ip.kbid = :1 and p.kbid = :1 and rt.rtype = 'p'
+		    union
+		    select propertyid1, rt.id, propertyid2, rt.id, p.id from equivalentproperty ep, property p, resourcetype rt 
+		      where p.name = 'equivalentProperty' and ep.kbid = :1 and p.kbid = :1 and rt.rtype = 'p'
+		    union
+		    select childid, rt.id, parentid, rt.id, p.id from subpropertyof sp, property p, resourcetype rt 
+		      where p.name = 'subPropertyOf' and sp.kbid = :1 and p.kbid = :1 and rt.rtype = 'p'
+		      -->
+          select rid1, rtid1, rid2, rtid2, pid from graph_edges r where r.kbid = :1 and 
+          r.hidden = false and rtid1 = 15 and rtid2 = 15
+  		</scanPropertyRelationships>
+  		<!-- searchNameLike: DEPRECATED. USE searchNameLike2. Search distinct concept/property/individual/literal with 
+  		     'like' condition, sort by edit distance and return the top n results. 
+  		     Explanation of the variables:
+  		     * :0 - the subquery from the combination of searchNameLikeInXXX.
+  		     * :6 - condition on edit distance 
+  		     * :7 - the number of results to return (e.g. if it is 10, only top 10 matched strings are returned.)
+  		-->
+  		<searchNameLike>
+			select name from (:0) t1 :6 order by d limit :7;	
+  		</searchNameLike>
+  		<!-- Explanation:
+  		     * :1 - the query string in lower case. 
+  		     * :2 - condition on kb. See explanation at bottom of the file.
+  		     * :3 - if the query string contains special characters ('%', '_'), the value is E. Empty string otherwise.
+  		     * :4 - original query string.
+  		     * :5 - "NOT" or ""
+  		 -->
+  		<searchNameLikeInClasses>
+  		    select name, editdistance(':4', name) as d from primitiveclass where lower(name) :5 like :3':1%' and is_system = false :2
+  		</searchNameLikeInClasses>
+  		<searchNameLikeInInstances>
+  		    select name, editdistance(':4', name) as d from individual where lower(name) :5 like :3':1%'
+  		</searchNameLikeInInstances>
+  		<searchNameLikeInProperties>
+  		    select name, editdistance(':4', name) as d from property where lower(name) :5 like :3':1%' and is_system = false :2
+  		</searchNameLikeInProperties>
+  		<searchNameLikeInLiterals>
+  		    select lexicalform as browsertext, editdistance(':4', lexicalform) as d from literal where lower(lexicalform) :5 like :3':1%' :2
+  		</searchNameLikeInLiterals>
+  		<searchTermLikeInLiterals>
+  		    select lexicalform as browsertext, editdistance(':4', lexicalform) as d from literal l
+  		    where lower(lexicalform) :5 like :3':1%' :2  and exists (select 1 from graph_edges e, 
+  		    property p where p.name in ('prefLabel', 'label', 'synonym', 'abbrev',  'hasExactSynonym', 'hasRelatedSynonym', 
+  		    'acronym', 'taxonomicCommonName', 'ncbiTaxScientificName', 'ncbiTaxGenbankCommonName', 
+  		    'ncbiTaxBlastName', 'ncbiIncludesName', 'ncbiInPartName', 'hasNarrowSynonym', 'misspelling', 'misnomer', 
+  		    'hasBroadSynonym') and p.id = e.pid and 
+  		    e.rid2 = l.id and e.rtid2 = 13)
+  		</searchTermLikeInLiterals>
+  		<!-- implement search name using a database function. It should replace searchName. 
+  		     * :1 - the query string, unformatted. No need to escape the string.
+  		     * :2 - kbid or null to search all kb.
+  		     * :3 - search type flag in 4-bit string. For example, 
+  		            say the search type has bit value DCBA: 
+                    If bit A is 1, then include primitive class type.
+                    If bit B is 1, then include individual type.
+                    If bit C is 1, then include property type.
+                    If bit D is 1, then include literal type.
+                    For value 0011, search primitive class and individual.
+  		     * :4 - prefLabel. If true, prefer to search the string as class label.
+  		-->
+  		<searchNameLike2>
+  		    select * from search_term(':1', :2, B':3', :4);
+  		</searchNameLike2>
+  		<!-- searchNameRegEx: search distinct concept/property/individual/literal using regular expression.
+  		     The results are not ordered by edit distance
+  		     * :1 - the query string
+  		     * :2 - condition on kb. See explanation at bottom of the file.
+  		     * :3 - regex operator: ~* (match, case insensitive), !~* (does not match, case insensitive)
+  		     * :4 - the number of results to return. Use "ALL" to return all results.
+  		 -->
+  		<searchNameRegEx>
+  		    select browsertext from (:0) t1 limit :4    	
+  		</searchNameRegEx>
+  		<searchNameRegExInClasses>
+  		    select browsertext from primitiveclass where browsertext :3 ':1' and is_system = false :2
+  		</searchNameRegExInClasses>
+  		<searchNameRegExInInstances>
+  		    select browsertext from individual where browsertext :3 ':1' :2
+  		</searchNameRegExInInstances>
+  		<searchNameRegExInProperties>
+  		    select browsertext from property where browsertext :3 ':1' and is_system = false :2
+  		</searchNameRegExInProperties>
+  		<searchNameRegExInLiterals>
+  		    select lexicalform as browsertext from literal where lexicalform :3 ':1' :2
+  		</searchNameRegExInLiterals>
+  		<!-- Given a name, find all exact matches in class, property, individual and literal. 
+  		     Return matched IDs and RTIDs.
+  		     * :1 - the query string
+  		     * :2 - condition on kb. See explanation at bottom of the file.
+  		     * :3 - rtid of primitiveclass
+  		     * :4 - rtid of property
+  		     * :5 - rtid of individual
+  		     * :6 - rtid of literal
+  		 -->
+  		<searchAllIDByName>
+  		   select rid, rtid, name from get_ids(':1', :4, true, :2) :3;
+  		</searchAllIDByName>
+	</query>
+    <!-- Some explanation: 
+    kb condition: SQL condition expression on KBID. For exmaple: 
+                  "and kbid = SOME_KBID" or "and kbid in (A, B, ..)" 
+  		          or "" (no restriction). If empty string "" is used, all kb will 
+  		          be searched.
+    -->
+</db_config>
+<!-- old SearchAllIDByName 		    select id, :3 from primitiveclass where name = ':1' and is_system = false :2 union
+  		    select id, :4 from property where name = ':1' and is_system = false :2 union
+  		    select id, :5 from individual where name = ':1' :2 union
+  		    select id, :6 from literal where lexicalform = ':1' :2
+-->

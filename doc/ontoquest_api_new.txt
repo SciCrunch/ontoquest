@@ -1,0 +1,261 @@
+Types used in the functions:
+CREATE TYPE edge2 AS (rid1 INTEGER, rtid1 INTEGER, name1 TEXT, 
+     rid2 INTEGER, rtid2 INTEGER, name2 TEXT, pid INTEGER, pname TEXT);
+
+CREATE TYPE node1 AS (rid INTEGER, rtid INTEGER, name TEXT);
+
+CREATE TYPE node2 AS (rid INTEGER, rtid INTEGER);
+
+CREATE TYPE idx_node AS (idx VARCHAR(511));
+
+CREATE TYPE idx_edge AS (idx1 VARCHAR(511), idx2 VARCHAR(511));
+
+CREATE TYPE id_typ AS (id INTEGER);
+
+---------------------------------------------------------------
+/*
+  Get the name of node identified by (theRid, theRtid). If prefLabel is true, use its rdfs:label
+  as node name. If prefLabel is false or rdfs:label is not set, just return the name.
+ */
+TEXT get_name(theRid INTEGER, theRtid INTEGER, prefLabel BOOLEAN, defaultName TEXT);
+
+/*
+  Get the id of a term. 
+  @param term: the term to search
+  @param useLabel: If useLabel is true, treat the term as a rdfs:label of the concept.
+  @param is_synonym_searched: If true, consider the term be a synonym of a concept.
+  @param kbid the list of knowledge bases to search. If null or empty, search all.
+  @return set of node1 objects.
+ */
+
+SETOF node1 get_id(term VARCHAR, useLabel BOOLEAN, is_synonym_searched BOOLEAN, kbid INTEGER[]);
+
+  /*
+     Get the IDs of the term list.
+     @param term_list_str: the serialized term list in the format of '''AAA'', ''BB BBB'''.
+     @param useLabel: if true, return the label as term name.
+     @param is_synonym_searched: if true, consider the term as synonym as some concept.
+     @param kbid: the knowledge base id list. empty list or null to search all kb.
+   */
+SETOF node1 get_ids(term_list_str VARCHAR,  useLabel BOOLEAN, is_synonym_searched BOOLEAN, kbidList INTEGER[]);
+
+/*
+  return the edit distance between 2 terms.
+ */
+INTEGER editdistance (term1 text, term2 text);
+
+/*
+  transform the knowledge base identified by kbid into a customized graph view. The transformation rules are documented separately.
+*/
+boolean update_graph(kbid INTEGER);
+
+--------------------------------------------------------------
+---- several get_neighborhood functions with different flavor
+--------------------------------------------------------------
+/*
+  Get neighbors of nodes. If a DAG index is created for the pid and suitable for the query, use the index for fast
+  search. Otherwise, do a BFS.
+  @param idList a list of (rid, rtid).
+  @param pidList property id list. for example, the id of property subClassOf, part-of.
+  @param excludedPidList property list to be excluded from the query.
+  @param prefLabel When true, use rdfs:label as node name, if the label is available. Otherwise, use name column.
+  @param maxHops max number of levels to search
+  @param no_hidden if true, ignore hidden edges.
+  @param include_subproperties if true, include the edges whose edge label is a subPropertyOf pid
+  @param class_only if true, retrieve only those neighbors who are classes.
+  @param dir_incoming get neighbors which come into the idList.
+  @return set of edge2 objects
+*/
+
+SETOF edge2 get_neighborhood(idList INTEGER[][], pidList INTEGER[], excludedPidList INTEGER[],
+       prefLabel boolean, maxHops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, class_only BOOLEAN, dir_incoming BOOLEAN);
+
+/*
+  Get neighborhood of a node (rid, rtid). If a DAG index is created for the pid, use the index for fast
+  search. Otherwise, do a BFS.
+  @param rid resource id. A pair of rid and rtid identifies a term.
+  @param rtid resource type id.
+  @param pid property id. for example, the id of property subClassOf.
+  @param prefLabel if true, use rdfs:label, if available, as node name. Otherwise, use name column.
+  @param maxHops max number of levels to search
+  @param no_hidden if true, ignore hidden edges.
+  @param include_subproperties if true, include the edges whose edge label is a subPropertyOf pid
+  @param class_only if true, retrieve only those neighbors who are classes.
+  @param dir_incoming get neighbors which come into the idList.
+  @return set of edge2 objects
+*/
+SETOF edge2 get_neighborhood(rid INTEGER, rtid INTEGER, pid INTEGER, prefLabel boolean, 
+       maxHops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, class_only BOOLEAN, dir_incoming BOOLEAN) 
+
+/*
+  Get neighborhood of a list of nodes. If a DAG index is created for the pid, use the index for fast
+  search. Otherwise, do a BFS.
+  @param term_list_str. The string representation of the term list. The format is '''AAA'', ''BB BB'', ''VV V VVV'''.
+         For instance, '''Cerebellum'', ''Purkinje Cell'', ''Cerebellar Cortex'''.
+  @param pname_list_str. The string representation of the properties. The format is same as term_list_str. e.g. 
+         '''has_part'', ''subClassOf'''.
+  @param excludedPidList property list to be excluded from the query.
+  @param kbid The knowledge base id.
+  @param prefLabel if true, use rdfs:label, if available, as node name. Otherwise, use name column.
+  @param maxHops max number of levels to search
+  @param no_hidden if true, ignore hidden edges.
+  @param include_subproperties if true, include the edges whose edge label is a subPropertyOf pid
+  @param class_only if true, return the class descendants only.
+  @param is_synonym_searched true to search the term as a synonym. False to search as name.
+  @param dir_incoming get neighbors which come into the idList.
+  @return set of edge2 objects
+*/
+SETOF edge2 get_neighborhood(term_list_str VARCHAR, pname_list_str VARCHAR, excluded_pname_list_str VARCHAR, kbid INTEGER, 
+       prefLabel boolean, maxHops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, class_only BOOLEAN, 
+       is_synonym_searched BOOLEAN, dir_incoming BOOLEAN);
+
+/*
+  Get neighborhood of a list of nodes. If a DAG index is created for the pid, use the index for fast
+  search. Otherwise, do a BFS.
+  @param idList a list of term ids. Each inner array has two elements: rid and rtid. An example input is ARRAY[[1234, 1], [3252, 1]].
+  @param pname_list_str. The string representation of the properties. The format is same as term_list_str. e.g. 
+         '''has_part'', ''subClassOf'''.
+  @param excluded_pname_list_str. the property names to be excluded. Same format as pname_list_str. null means nothing to be excluded.
+  @param kbid The knowledge base id. 0 means the same knowledge base as idList[1]. null or -1 means all knowledge bases.
+  @param prefLabel if true, use rdfs:label, if available, as node name. Otherwise, use name column.
+  @param maxHops max number of levels to search
+  @param no_hidden if true, ignore hidden edges.
+  @param include_subproperties if true, include the edges whose edge label is a subPropertyOf pid
+  @param class_only if true, return the class descendants only.
+  @param dir_incoming get neighbors which come into the idList.
+  @return set of edge2 objects
+*/
+
+SETOF edge2 get_neighborhood(idList INTEGER[][], pname_list_str VARCHAR, excluded_pname_list_str VARCHAR, kbid INTEGER, prefLabel boolean, 
+       maxHops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, class_only BOOLEAN, dir_incoming BOOLEAN);
+
+  /*
+    search term using LIKE in the specified ontology.
+    @param searchStr: the string to be searched.
+    @param theKbid: the knowledge base id to be searched. If theKbid <= 0, all knowledge base is searched.
+    @param searchType: the resource type flag in bits. say the searchType has bit value DCBA. 
+                       If bit A is 1, then include primitive class type.
+                       If bit B is 1, then include individual type.
+                       If bit C is 1, then include property type.
+                       If bit D is 1, then include literal type.
+    @param prefLabel: if true, search rdfs:label first. And use the label as resource name.
+  */
+SETOF node1 search_term(searchStr text, theKbid integer, searchType bit, prefLabel boolean);
+
+--------------------------------------------------
+-- dag related functions.
+--------------------------------------------------
+ /*
+   get dag index for node (rid1, rtid1) from index table (tree_tbl_name)
+ */
+VARCHAR get_dag_idx(rid1 integer, rtid1 integer, tree_tbl_name VARCHAR);
+
+/*
+  Check if node 2 (idx2) is an ancestor of node 1 (idx1) in the specified DAG.
+*/
+BOOLEAN is_ancestor(idx1 VARCHAR, idx2 VARCHAR, tree_tbl_name VARCHAR, sspi_tbl_name VARCHAR);
+
+/*
+  Check if node 2 (rid2, rtid2) is an ancestor of node 1 (rid1, rtid1) in the DAG identified by thePid.
+*/
+BOOLEAN is_ancestor(rid1 INTEGER, rtid1 INTEGER, rid2 INTEGER, rtid2 INTEGER, thePid INTEGER);
+
+/*
+  Return ancestor nodes up to <code>level</code> hops in the DAG specified by thePid
+  @param rid resource id. A (rid, rtid) pair identifies a node uniquely.
+  @param rtid resource type id.
+  @param thePid the property id which identifies the edge label. A DAG index should have been created for thePid subgraph.
+  @param level the maximum hops of ancestors to return. If 0, return all.
+  @param include_subproperties if true, the DAG should be created with subproperties of thePid.
+  @param no_hidden if true, exlcude hidden edges.
+*/
+SETOF node2 get_ancestor_nodes_in_dag(rid INTEGER, rtid INTEGER, thePid INTEGER, level INTEGER,
+    include_subproperties BOOLEAN, no_hidden BOOLEAN);
+    
+/*
+  Find Least Common Ancestor (LCA) of node1 (identified by idx1) and node2 (identified by idx2).
+  @param idx1 DAG index of node1
+  @param idx2 DAG index of node2
+  @param tree_tbl_name name of the DAG tree table which stores the index of all nodes.
+  @param sspi_tbl_name table that stores SSPI edges.
+ */
+VARCHAR find_lca(idx1 varchar, idx2 varchar, tree_tbl_name varchar, sspi_tbl_name varchar);
+
+/*
+  Find the least common ancestor (LCA) of input nodes.
+  @param nodes: an array of int[2](rid, rtid).
+  @param thePid: the edge id
+  @param include_subproperties: if true, the DAG should be created with subproperties of thePid.
+  @param no_hidden: if true, exlcude hidden edges.
+  @param lcaRid: rid of the LCA node.
+  @param lcaRtid: rtid of the LCA node.
+*/
+void get_lca_in_dag(IN nodes int[][], IN thePid int, IN include_subproperties BOOLEAN, IN no_hidden BOOLEAN, OUT lcaRid int, OUT lcaRtid int)
+
+/*
+  Return the paths between rid1 and rid2 in the DAG.
+*/
+SETOF edge2 get_dag_path(rid1 int, rtid1 int, rid2 int, rtid2 int, thePid int, include_subproperties BOOLEAN, no_hidden BOOLEAN);
+
+/*
+  Return descendant nodes up to <code>level</code> hops in the DAG specified by thePid
+  @param rid resource id. A (rid, rtid) pair identifies a node uniquely.
+  @param rtid resource type id.
+  @param thePid the property id which identifies the edge label. A DAG index should have been created for thePid subgraph.
+  @param level the maximum hops of ancestors to return. If 0, return all.
+  @param include_subproperties if true, the DAG should be created with subproperties of thePid.
+  @param no_hidden if true, exlcude hidden edges.
+*/
+SETOF node2 get_descendant_nodes_in_dag(rid INTEGER, rtid INTEGER, thePid INTEGER, level INTEGER, include_subproperties BOOLEAN, no_hidden BOOLEAN);
+
+/*
+  get the number of neighbors up to level = hops for the input node (rid, rtid), if a DAG index is created for the pid. 
+  Return -1 if the count is not available.
+  @param rid resource id of the node
+  @param rtid resource type id of the node
+  @param pid property id
+  @param hops the max level. 0 means all level. 1 means the immediate neighbors. 2 means the sum of neighbor count at level 1 and 2, and so on.
+  @param no_hidden if true, do not include hidden edges.
+  @param include_subproperties if true, include those neighbors that are connected via sub-property of pid.
+*/
+INTEGER get_neighbor_count(rid integer, rtid integer, thePid integer, hops integer, no_hidden boolean, 
+                           include_subproperties boolean, dir_incoming boolean);
+
+/*
+  Get count of neighborhood of a list of nodes. If a DAG index is not created for the pid, return -1.
+  @param term_list_str. The string representation of the term list. The format is '''AAA'', ''BB BB'', ''VV V VVV'''.
+         For instance, '''Cerebellum'', ''Purkinje Cell'', ''Cerebellar Cortex'''.
+  @param pname_list_str. The string representation of the properties. The format is same as term_list_str. e.g. 
+         '''has_part'', ''subClassOf'''.
+  @param kbid The knowledge base id.
+  @param prefLabel if true, use rdfs:label, if available, as node name. Otherwise, use name column.
+  @param hops number of levels to include
+  @param no_hidden if true, ignore hidden edges.
+  @param include_subproperties if true, include the edges whose edge label is a subPropertyOf pid
+  @param is_synonym_searched true to search the term as a synonym. False to search as name.
+  @param dir_incoming if true, count the incoming neighbors. Otherwise, count the outgoing neighbors.
+*/
+INTEGER get_neighbor_count(term_list_str VARCHAR, pname_list_str VARCHAR, kbid INTEGER, prefLabel BOOLEAN,
+       hops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, is_synonym_searched BOOLEAN, dir_incoming BOOLEAN);
+
+/*
+  Build DAG index for the pid graph. First, compute maximum spanning tree on the input DAG using Prim's algorithms. Then, add SSPI edges.
+  An artificial root (rid=0, rtid=0) will be created for the DAG to guarantee 
+  single root. 
+  @param sql: The SQL which will return edges of a general graph. It is expected to have
+  the following integer columns: rid1, rtid1, rid2, rtid2, pid. It is not required that the graph is a DAG.
+  If the sql is null, the default sql will be used: select rid1, rtid1, rid2, rtid2, pid from graph_edges e where e.kbid = kbid and e.hidden = false  
+  @param kbid: The knowledge base id to which this dag index is associated with. It is not required that all nodes/edges in the
+  DAG must come from the same kb. When the kb is deleted, this DAG index will be deleted as well.
+  @param pid: property id which identifies the DAG edge type, e.g. id of has_part.
+  @param include_subproperties: if true, expand pid to include its subproperties. all edges linked by the 
+  subproperties are included into the DAG.  
+  @param no_hidden if true, hidden edges are excluded from the DAG.
+  @return the DAG id.
+*/
+INTEGER compute_dag_index(sql TEXT, kbid INTEGER, pid INTEGER, include_subproperties BOOLEAN, no_hidden BOOLEAN);
+
+/*
+  Delete DAG identified by dag_id
+ */
+VOID delete_dag_index(dag_id integer) ;

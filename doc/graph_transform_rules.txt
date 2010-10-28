@@ -1,0 +1,137 @@
+Graph_nodes and graph_edges are the tables to store nodes and edges, respectively. Here are their definition:
+
+/*
+ * The node table in graph view. Each node is identified by (rid, rtid) pair.
+ * @col rid -- resource id.
+ * @col rtid -- resource type id.
+ * @col name -- name stored in ontology. 
+ * @col label -- the text to be displayed as node label. Some ontologies use rdfs:label for display, name as string identifier.
+ * @col kbid -- knowledge base id
+ * @col anonymous -- if true, the node is an anonymous class. In general, 
+ * anonymous is hidden from user. 
+ */
+create table graph_nodes (
+  rid integer NOT NULL,
+  rtid integer NOT NULL,
+  name text,
+  label text,
+  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
+  anonymous boolean default false,
+  constraint node_pk PRIMARY KEY (rtid, rid)
+);
+
+/*
+ * The edge table in graph view. It contains the edge list in the graph.
+ * @col rid1 -- resource id of node 1 (source node)
+ * @col rtid1 -- resource type id of node 1 (source node)
+ * @col pid -- property id which identifies the edge label
+ * @col rid2 -- resource id of node 2 (target node)
+ * @col rtid2 -- resource type id of node 2 (target node)
+ * @col kbid -- knowledge base id
+ * @col derived -- if true, the edge is derived, e.g. from a restriction structure.
+ * @col hidden -- if true, the edge should be hidden in normal case. Usually, if an edge involves an anonymous 
+ * class, it should be hidden, unless the anonymous class must be shown in order to connecting with other nodes.
+ * @col restriction_type -- if not null, there exists some kind of restriction on the edge.
+ * a means forall (AllValuesFrom), e means exists (SomeValuesFrom), n means minCardinality,
+ * c means cardinality, x means maxCardinality.
+ * @col restriction_stmt -- the restriction statement (text to be shown along with the edge label).
+ */
+create table graph_edges (
+  rid1 integer NOT NULL,
+  rtid1 integer NOT NULL,
+  pid integer NOT NULL REFERENCES property (id) ON DELETE CASCADE,
+  rid2 integer NOT NULL,
+  rtid2 integer NOT NULL,
+  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
+  derived boolean default false,
+  hidden boolean default false,
+  restriction_type char(1),
+  restriction_stmt varchar(255),
+  constraint rtype_chk CHECK (restriction_type in ('a', 'v', 'b', 'm', 'n', null)),
+  foreign key (rid1, rtid1) references graph_nodes(rid, rtid) ON DELETE CASCADE,
+  foreign key (rid2, rtid2) references graph_nodes(rid, rtid) ON DELETE CASCADE
+);
+
+  Rules to populate node table are:
+  *) add all primitive classes, excluding system classes and non-owl classes. System classes are created by 
+     protege to represent meta class, e.g. "rdfs:Class", "rdf:Property". Non-owl classes are generally created by
+     protege as well, e.g. owl:DeprecatedClass.
+  *) add all individuals, excluding non-owl individuals. Non-owl individuals are usually created by protege, 
+     e.g. rdf:XMLLiteral.
+  *) add all properties as nodes.
+  *) add all literals as nodes.
+  *) add all data types as nodes.
+  *) add owl:Thing as a node. It is a special node. It is used to represent any unspecified node.
+  *) add hasValue as nodes. All anonymous classes are transformed to nodes, although they may be hidden in the graph.
+     The node name is "hasValue class", and the node label is "something <property_label> as <value>", 
+     e.g. "something has Inherent 3D Shape as false".
+  *) add dataRange as an anonymous nodes. Use dataRange's browsertext column as name.
+  *) add cardinality as an anonymous nodes. Use "Cardinality Restriction" as name, use 
+     "something with <property_label> = <cardinality>" as label. For instance, "something with number of Axons = 1".
+  *) add minCardinality as anonymous nodes. Use "Min Cardinality Restriction" as name, use
+     "something with <property_label> >= <cardinality>" as label. For instance, "something with number of Axons >= 1".  
+  *) add maxCardinality as anonymous nodes. Use "Max Cardinality Restriction" as name, use
+     "something with <property_label> <= <cardinality>" as label. For instance, "something with number of Axons <= 1".
+  *) add someValuesFrom as anonymous nodes. Use "SomeValuesFrom Restriction" as name, use
+     "something [exists]<property_label> <value>" as label. For instance, 'something [exists]has_quality DNA'.
+  *) add allValuesFrom as anonymous nodes. Use "AllValuesFrom Restriction" as name, use
+     "something [forall]<property_label> <value>" as label. For instance, 'something [forall]"has Neurotransmitter" Glutamate'.
+  *) add complement classes as anonymous nodes. Use "Complement Class" as name, use
+     "not (<class>)" as label. For instance, 'not (Chordata)'.
+  *) add union classes as anonymous nodes. Use "Union Class" as name, use
+     "union of (<class1>, <class2>, ...)" as label. For instance, "union of (Right limbic lobe, Left limbic lobe)".
+  *) add intersection classes as anonymous nodes. Use "Intersection Class" as name, use
+     "intersection of (<class1>, <class2>, ...)" as label. For instance, 'intersection of (something [exists]has_quality DNA, chromosome)'.
+  *) add oneOf as anonymous nodes. Use "Enumerated Class" as name, use
+     "one of (<class1>, <class2>, ...)" as label. For instance, "one of (Rat elderly, Rat late elderly, Rat early elderly)".
+  *) add allDifferentIndividual as anonymous nodes. Use "All Different Individual" as name, use
+     "AllDifferent {<individual1>, <individual2>, ...}" as label. For instance, "AllDifferent {birn_annot:ABA_app, birn_annot:BAMS_app}".
+  
+  Notice that some class' labels cannot be set unless its member classes get the labels. So the process of label assignment 
+  must run recursively until all labels are set. To speed up the process, I run a procedure to assign labels 
+  for unassigned nodes for 5 times. After 5 runs, if there remain unset nodes, I then do a recursive assignment for each of the nodes. 
+  
+  Rules to transform edges are:
+  *) add subClassOf edges, excluding those represent equivalent classes (A subClassOf B and B subClassOf A).
+     Besides, exclude those edges that involve system classes or non-owl classes.
+     If the source or target node is an anonymous class, set the edge as hidden. The same rule to set hidden flag is applied to other edges.
+  *) add equivalentClass edges. 
+  *) add typeOf relationships as non-hidden edges.
+  *) add user-defined relationships as non-hidden edges.
+  *) add subPropertyOf edges, excluding equivalent properties (A subPropertyOf B and B subPropertyOf A) and system-defined subProperty edges.
+  *) add equivalentProperty edges.
+  *) add inverseOf edges.
+  *) add disjointClasses as edges.
+  *) add differentFrom as edges.
+  *) add sameAs as edges.
+  *) If a property has both domain and range, combine domain and range into one edge. 
+     Treat domain as subject (source) and range as object (target). For example, 
+       <owl:DatatypeProperty rdf:ID="yearValue">
+         <rdfs:domain rdf:resource="#VintageYear" />    
+         <rdfs:range  rdf:resource="&xsd;positiveInteger" />
+       </owl:DatatypeProperty>
+     In the case aboe, an edge "VintageYear yearValue positiveInteger" is created.
+     If a property has domain restriction, but no range, use owl:Thing as range. vice versa for range restriction.     
+     Also, add "<property> domain <domain_class>" and "<property> range <range_class>" as edges. For the example above,
+     "yearValue domain VintageYear" and "yearValue range positiveInteger" are added.
+  *) add complementOf edges.
+  *) add unionOf edges between union class and its members.
+  *) add intersectionOf edges between intersection class and its members.
+  *) add oneOf edges between enumeration class and its members.
+  *) add allDifferentIndividuals as edges.
+  *) add inferred edge from allValuesFrom class. For instance, "Wine -- subclassOf -> (something --:forall:hasMaker-> Winery)"
+     will generate: "Wine -- :forall:hasMaker -> Winery".
+     Also, add "<allValuesFrom anonymous class> <property> <range_class>" as a hidden edge. 
+     e.g. "(something [forall]hasMaker Winery) hasMaker Winery".
+  *) add edges from someValuesFrom class, similar to how allValuesFrom class is added.
+  *) add derived edge from cardinality class as non-hidden edge. For example, 
+     "Vintage -subClassOf-> (something -hasVintageYear(card=1)-> integer)" will be converted to
+     "Vintage -hasVintageYear(card=1)->integer".
+     Also, add "<Cardinality anonymous class> hasCardinality <value>" as a hidden edge.
+  *) add minCardinality class, similar to how cardinalityClass is added.
+  *) add maxCardinality class, similar to how cardinalityClass is added. 
+  *) update status of some hidden edges. If a restriction appears as object of another non-hidden edge (edge A), 
+     set the corresponding restriction edge (edge B) to non-hidden. Otherwise, edge A cannot be reached. 
+
+Notice that the table to represent each kind of relationship has different schema from the others. Therefore, the query to transform
+each relationship is different. The details are not critical, so they are skipped here.

@@ -1,0 +1,136 @@
+/*
+  Get root class in subClassOf hierarchy.
+  @param kbid: the knowledge base id
+  @excludeOWLThing: if true, ignore owl:Thing as root. If false, allow owl:Thing as root
+  @prefLabel: if true, prefer using property rdfs:label as class name. Otherwise, use the real class name.
+*/
+SETOF node1 get_root(theKbid integer, excludeOWLThing boolean, prefLabel boolean);
+
+  /*
+    compose rtid condition based on the input type. say theType has value DCBA. 
+    If bit A is 1, then include primitive class type.
+    If bit B is 1, then include individual type.
+    If bit C is 1, then include property type.
+    If bit D is 1, then include literal type.
+    
+  */
+VARCHAR set_resource_type(theType bit);
+
+/*
+  compose property id condition used in search function
+ */
+TEXT compose_pid_condition(pidList INTEGER[], include_subproperties BOOLEAN, negate BOOLEAN);
+
+/*
+  Set the label identified by (theRid, theRtid) in graph_nodes table.
+  @param theRid -- the rid of the node
+  @param theRtid -- the rtid of the node
+  @param isRecursive -- In some cases, the label of an anonymous class, e.g. union class, cannot be determined before
+                        the labels of its members are set. In such cases, if isRecursive is false, exit the function without
+                        setting the label and return false. Is isRecursive is true, set its memebers' label recursively and
+                        then set the label of the input node.
+  
+  Steps: 
+  1) First, check if the resource has a rdfs:label property. If so, use the value of rdfs:label as the resource's label. Return true.
+  2) Otherwise, check if the resource has a name. If so, use the name as label. Return true.
+  3) For anonymous classes, check if the resources used in class definition have labels or not. If yes, set the label depending on class type.
+  Return true. If not, decide if we need to set the labels of member classes, depending on the isRecursive flag.
+*/
+TEXT set_label(theRid INTEGER, theRtid INTEGER, isRecursive BOOLEAN);
+
+/*
+  set labels for all nodes in graph_nodes table for the specified kbid. 
+ */
+VOID set_labels(theKbid INTEGER);
+
+TEXT get_label(theRid INTEGER, theRtid INTEGER);
+
+-- drop a schema object if it exists.
+INTEGER drop_if_exists (name text);
+
+--------------------------------------------------------------------
+-- Internal functions used in computing DAG indx
+--------------------------------------------------------------------
+/*
+  Given a dewey index, e.g. 0.3.67.18.324, split it by dilimiter ".", and return the ancestors as a set of integers.
+  Note: use id_typ instead of integer as return type so that the column can be referenced in caller sql.
+*/
+SETOF id_typ split_index(idx_str VARCHAR);
+
+/* Nearest Branch Ancestor (NBA) is the nearest ancestor that is a branch node. Branch node is a node with multiple parents. 
+     If the input node itself is a branching node, then its NBA is itself.
+     @param idx_str: the dewey index of a node
+     @param sspi_tbl_name: the SSPI table for search
+     @return the index of the NBA node.
+*/
+VARCHAR get_nba_idx(idx_str VARCHAR, sspi_tbl_name VARCHAR);
+
+/*
+  Add a node identified by rid, rtid into the table (tbl_name). If the node
+  already exists, just return its current node ID.
+  @tbl_name the name of the node table.
+  @rid resource id from ontoquest db.
+  @rtid resource type id.
+  @return the node ID. 
+*/
+INTEGER put_node(tbl_name VARCHAR, theRid INTEGER, theRtid INTEGER);
+
+/*
+   encode index for node id1 in tbl_name. In general, this function is only used by compute_dag_index(...)
+   @param tbl_name tree table name
+   @id1 id in tbl_name table. 
+   @ori_id original id when the function is invoked by external function. It is used to check cycle.
+*/
+VARCHAR encode_index(tbl_name VARCHAR, id1 INTEGER, ori_id INTEGER);
+
+  /*
+   encode index for node id1 in tbl_name. In general, this function is only used by compute_dag_index(...)
+   @param tbl_name tree table name
+   @id1 id in tbl_name table. 
+  */
+VARCHAR encode_index(tbl_name VARCHAR, id1 INTEGER);
+
+/*
+  Check if node 2 (dag_index = idx2) is an ancestor of node 1 (dag_index = idx1). node 1 is a branching node.
+*/
+BOOLEAN is_ancestor_of_nba(idx1 VARCHAR, idx2 VARCHAR, tree_tbl_name VARCHAR, sspi_tbl_name VARCHAR);
+
+/*
+  compute surrogate predecessors in DAG. Used in computing DAG index.
+*/
+VOID compute_dag_surrogate_pred(dag_id integer, tree_tbl varchar, sspi_tbl varchar);
+
+SETOF idx_node get_sspi_ancestor_nodes(idx VARCHAR, tree_tbl_name VARCHAR, sspi_tbl_name VARCHAR, level INTEGER);
+
+SETOF idx_node get_sspi_descendant_nodes(idx VARCHAR, tree_tbl_name VARCHAR, sspi_tbl_name VARCHAR, level INTEGER);
+
+--------------------------------------------------------------------
+-- End of Internal functions used in computing DAG indx
+--------------------------------------------------------------------
+
+
+--------------------------------------------------------------------------
+-- functions used in computing goodness score. The score is used during query time of computing center piece graph
+--------------------------------------------------------------------------
+-- expand_ children_depth: compute children's depth of a node.
+-- param theRid: the node's rid
+-- param theRtid: the node's rtid
+-- param theKbid: the knowledge base to search for children
+-- param thePid: property id of the edge connecting child and its parent
+-- param theLevel: the level of node (theRid, theRtid)
+-- param theTreetype: category of thePid
+-- param ancestors: array of [rid, rtid]. They are the node's ancestors. Used for checking cycle.
+VOID expand_children_depth(theRid integer, theRtid integer, theKbid integer, 
+  thePid integer, theLevel integer, theTreetype char, ancestorTbl varchar);
+  
+-- compute depth for hierarchy tree w.r.t. property (id = thePid), e.g. subClassOf, subPropertyOf, partOf
+VOID compute_depth(theKbid integer, thePid integer, theTreetype char);
+
+VOID compute_pi ();
+
+-- compute weight for each edge.
+VOID compute_weight();
+
+
+
+

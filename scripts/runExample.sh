@@ -1,0 +1,1 @@
+java -cp .:./config:OntoQuest.jar:lib/commons-beanutils.jar:lib/commons-collections-3.2.jar:lib/commons-configuration-1.4.jar:lib/commons-lang-2.3.jar:lib/commons-logging-1.1.jar:lib/Jama-1.0.2.jar:lib/junit-3.8.1.jar:lib/log4j-1.2.14.jar:lib/postgresql-8.2dev-500.jdbc3.jar $1

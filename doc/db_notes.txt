@@ -1,0 +1,55 @@
+FROM shui.sdsc.edu
+
+1. Installation Steps
+
+./configure --prefix=/scratch/slocal/apps/pgsql --with-perl
+gmake
+gmake check
+gmake install
+setenv LD_LIBRARY_PATH '/scratch/slocal/apps/pgsql/lib' (set the variable in .cshrc)
+set path = ( /scratch/slocal/apps/pgsql/bin $path )
+
+Start server (run as xqian)
+/scratch/slocal/apps/pgsql/bin/initdb -D /scratch/slocal/apps/pgsql/data
+/scratch/slocal/apps/pgsql/bin/pg_ctl start -D /scratch/slocal/apps/pgsql/data -l /scratch/slocal/apps/pgsql/log/logfile
+
+1b. Stop server
+/scratch/slocal/apps/pgsql/bin/pg_ctl stop -D /scratch/slocal/apps/pgsql/data
+
+2. Create new datatbase
+/scratch/slocal/apps/pgsql/bin/createdb test
+/scratch/slocal/apps/pgsql/bin/createdb test -e UNICODE
+
+3. Use psql client -- psql [DB] [USER]
+/scratch/slocal/apps/pgsql/bin/psql test
+/scratch/slocal/apps/pgsql/bin/psql test ont
+
+4. Create role/user
+*) create super user:
+create role sys superuser login createdb createrole createuser password 'XXXXXXXX';
+
+*) create regular user: -- also see 'Create user with matched schema (non-public)'
+create role ont login password 'XXXXXXXX';
+
+*) create user with matched schema
+create role executor login password 'XXXXXXXX';
+create schema executor;
+grant all on schema executor to executor;
+
+-- Since "$user" is the first element in search_path, all objects created by executor will locate in schema executor by default.
+
+5. Allow TCP/IP connections -- different from PostgreSQL 7.x and earlier version
+5.1) In data/postgresql.conf, change 
+       listen_addresses = 'localhost' 
+     to
+       listen_addresses = '*'
+5.2) In data/pg_hba.conf, add entries to allow connections from remote machines. For example,
+     to allow user 'ont' to connect to database 'test' from any machine, add the following entry:
+       host    test        ont         0.0.0.0/0             password
+ 
+6. Define a new procedure language, such as pgplsql, in a database
+6.1) List currently installed language:
+createlang -l ontoquest
+
+6.2) Add a language:
+createlang pgplsql ontoquest
