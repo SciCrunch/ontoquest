@@ -1,7 +1,7 @@
-/* TABLES AND ROUTINES for NIF Card application. 
+﻿/* TABLES AND ROUTINES for NIF Card application. 
     Usage: call fill_nif_cards()
 */
-/*
+
 DROP TABLE IF EXISTS nif_brain_region cascade;
 
 DROP TABLE IF EXISTS nif_cell cascade;
@@ -49,10 +49,11 @@ CREATE TABLE nif_cell
 CREATE TABLE nif_brain_cell
 (
   card_id serial primary key,
-  brain_region_id integer,
-  cell_id integer
+  brain_region_id integer references nif_brain_region,
+  brain_region_concept_id text,
+  cell_id integer references nif_cell,
+  cell_concept_id text
 );
-*/
 
 CREATE OR REPLACE FUNCTION fill_nif_cards() RETURNS VOID AS $$
 
@@ -171,7 +172,9 @@ CREATE OR REPLACE FUNCTION fill_nif_brain_cell() RETURNS VOID AS $$
     -- remove those derived edges whose region is in the exclusion list.
     DELETE FROM nif_tmp_bc WHERE derived = true and brain_region_id IN (select id from nif_brain_region where concept_id = ANY(excludedRegions));
 
-    INSERT INTO nif_brain_cell (brain_region_id, cell_id) select distinct brain_region_id, cell_id FROM nif_tmp_bc; 
+    INSERT INTO nif_brain_cell (brain_region_id, brain_region_concept_id, cell_id, cell_concept_id) 
+    select distinct bc.brain_region_id, r.concept_id, bc.cell_id, c.concept_id FROM nif_tmp_bc bc, nif_brain_region r, nif_cell c
+    where bc.brain_region_id = r.id and bc.cell_id = c.id; 
      
     EXECUTE 'DROP TABLE nif_tmp_bc';
   END;
