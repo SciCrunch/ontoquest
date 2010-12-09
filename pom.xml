@@ -111,4 +111,16 @@
 		</dependency>
 		
 	</dependencies>
+	<distributionManagement>
+		<repository>
+			<id>releases</id>
+			<name>Internal Releases</name>
+			<url>http://maven.crbs.ucsd.edu/nexus/content/repositories/releases</url>
+		</repository>
+		<snapshotRepository>
+			<id>snapshots</id>
+			<name>Internal Snapshots</name>
+			<url>http://maven.crbs.ucsd.edu/nexus/content/repositories/NIF-snapshot</url>
+		</snapshotRepository>
+	</distributionManagement>
 </project>
