@@ -190,12 +190,16 @@ CREATE OR REPLACE FUNCTION fill_nif_brain_cell() RETURNS VOID AS $$
     select into properPartOf id from property where name = 'proper_part_of' and kbid = theKbid;
 
     -- case 1: With macro relation 'soma_located_in':  e.g., 'Neuron X'  is a 'Neuron'  whose 'soma_located_in' some 'Brain region Y'
-    INSERT INTO nif_tmp_bc (brain_region_id, cell_id, derived) select r.id as brain_region_id, c.id as cell_id, false from graph_edges, nif_brain_region_all r, nif_cell c where pid  = somaLocatedIn and rid1 = c.rid and rtid1 = c.rtid and rid2 = r.rid and rtid2 = r.rtid;
+    INSERT INTO nif_tmp_bc (brain_region_id, cell_id, derived) select r.id as brain_region_id, c.id as cell_id, false from graph_edges, 
+    nif_brain_region_all r, nif_cell c where pid  = somaLocatedIn and rid1 = c.rid and rtid1 = c.rtid and rid2 = r.rid and rtid2 = r.rtid;
 
     -- case 2: With expanded relation in terms of 'proper_part_of' and 'has_proper_part'.
     -- e.g., Neuron X is a Neuron which 'has_proper_part' some 'Somatic portion' and that 'Somatic portion' is 'proper_part_of' some 'Brain Region Y'.
   
-    INSERT INTO nif_tmp_bc (brain_region_id, cell_id, derived) select r.id, c.id, false from graph_edges e1, graph_edges e2, graph_edges e3, nif_brain_region_all r, nif_cell c where e1.rid2 = r.rid and e1.rtid2 = r.rtid and e1.pid = properPartOf and e1.rid1 = e2.rid2 and e1.rtid1 = e2.rtid2 and e2.rid1 = e3.rid2 and e2.rtid1 = e3.rtid2 and e3.rid1 = c.rid and e3.rtid1 = c.rtid and e3.pid = hasProperPart and not exists (select * from nif_tmp_bc bc where r.id = bc.brain_region_id and c.id = bc.cell_id);
+    INSERT INTO nif_tmp_bc (brain_region_id, cell_id, derived) select r.id, c.id, false from graph_edges e1, graph_edges e2, graph_edges e3, 
+    nif_brain_region_all r, nif_cell c where e1.rid2 = r.rid and e1.rtid2 = r.rtid and e1.pid = properPartOf and e1.rid1 = e2.rid2 and 
+    e1.rtid1 = e2.rtid2 and e2.rid1 = e3.rid2 and e2.rtid1 = e3.rtid2 and e3.rid1 = c.rid and e3.rtid1 = c.rtid and e3.pid = hasProperPart 
+    and not exists (select * from nif_tmp_bc bc where r.id = bc.brain_region_id and c.id = bc.cell_id);
 
     -- insert derived edges. If cell X is located in region Y, and Y is subclass of region Z, insert Z X into brain_cell table.
     FOR rec IN select distinct bc.cell_id, r.rid, r.rtid from nif_brain_region_all r, nif_tmp_bc bc where bc.brain_region_id = r.id 
