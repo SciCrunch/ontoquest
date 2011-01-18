@@ -1,7 +1,7 @@
-﻿drop table if exists graph_edges_all cascade;
+﻿/*drop table if exists graph_edges_all cascade;
 
 drop table if exists graph_nodes_all cascade;
-
+*/
 /*
  * The node table in graph view. Each node is identified by (rid, rtid) pair.
  * @col rid -- resource id.
@@ -13,6 +13,7 @@ drop table if exists graph_nodes_all cascade;
  * anonymous is hidden from user. 
  * @col is_obsolete -- if true, the node is deprecated.
  */
+ /*
 create table graph_nodes_all (
   rid integer NOT NULL,
   rtid integer NOT NULL,
@@ -36,7 +37,7 @@ CREATE INDEX node_label ON graph_nodes_all(label);
 CREATE INDEX node_label2 ON graph_nodes_all(lower(label), is_obsolete, kbid);
 
 create view graph_nodes as select * from graph_nodes_all where is_obsolete = false;
-
+*/
 /*
  * The edge table in graph view. It contains the edge list in the graph.
  * @col rid1 -- resource id of node 1 (source node)
@@ -54,6 +55,7 @@ create view graph_nodes as select * from graph_nodes_all where is_obsolete = fal
  * @col restriction_stmt -- the restriction statement (text to be shown along with the edge label).
  * @col is_obsolete -- if true, the edge is deprecated.
  */
+ /*
 create table graph_edges_all (
   rid1 integer NOT NULL,
   rtid1 integer NOT NULL,
@@ -66,9 +68,9 @@ create table graph_edges_all (
   restriction_type char(1),
   restriction_stmt varchar(255),
   is_obsolete boolean default false,
-  constraint rtype_chk CHECK (restriction_type in ('a', 'v', 'b', 'm', 'n', null)),
-  foreign key (rid1, rtid1) references graph_nodes_all(rid, rtid) ON DELETE CASCADE,
-  foreign key (rid2, rtid2) references graph_nodes_all(rid, rtid) ON DELETE CASCADE
+  constraint rtype_chk CHECK (restriction_type in ('a', 'v', 'b', 'm', 'n', null))
+  ,foreign key (rid1, rtid1) references graph_nodes_all(rid, rtid) ON DELETE CASCADE
+  ,foreign key (rid2, rtid2) references graph_nodes_all(rid, rtid) ON DELETE CASCADE
 ) with oids;
 
 -- create index on graph_edges
@@ -81,28 +83,6 @@ CREATE INDEX edge_pid ON graph_edges_all (pid);
 CREATE INDEX edge_kbid ON graph_edges_all (kbid);
 
 create view graph_edges as select * from graph_edges_all where is_obsolete = false;
-
-/*
-DROP TYPE IF EXISTS edge1 CASCADE;
-
-CREATE TYPE edge1 AS (rid1 INTEGER, rtid1 INTEGER, name1 TEXT, 
-    rid2 INTEGER, rtid2 INTEGER, name2 TEXT);
-
-DROP TYPE IF EXISTS edge2 CASCADE;
-
-CREATE TYPE edge2 AS (rid1 INTEGER, rtid1 INTEGER, rid2 INTEGER, rtid2 INTEGER);
-
-DROP TYPE IF EXISTS node1 CASCADE;
-
-CREATE TYPE node1 AS (rid INTEGER, rtid INTEGER, name TEXT);
-
-DROP TYPE IF EXISTS node2 CASCADE;
-
-CREATE TYPE node2 AS (rid INTEGER, rtid INTEGER);
-
-DROP TYPE IF EXISTS idx_node CASCADE;
-
-CREATE TYPE idx_node AS (idx VARCHAR(511));
 */
 
 CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursive BOOLEAN) RETURNS TEXT AS $$
@@ -665,6 +645,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
       t.kbid, false, false, null as restriction_type, null as restriction_stmt 
       from typeof t, property p where p.name = 'type' and p.is_system = true and p.kbid = t.kbid
       and exists (select * from graph_nodes_all n where t.classid = n.rid and t.class_rtid = n.rtid)
+--      and exists (select * from graph_nodes_all n where t.instanceid = n.rid and t.instance_rtid = n.rtid)
       and instance_rtid != 1 and t.kbid = theKbid;
     raise notice 'added typeof relationships as edges.';
 
