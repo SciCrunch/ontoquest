@@ -1,4 +1,4 @@
-select drop_if_exists('term_category');
+﻿select drop_if_exists('term_category');
 
 select drop_if_exists('term_category_tbl');
 
@@ -9,6 +9,7 @@ CREATE TABLE nif_term (
   tid varchar(64),
   rid integer,
   rtid integer,
+  inferred boolean,
   primary key (rid, rtid, term)
 );
 
@@ -24,7 +25,7 @@ CREATE TABLE term_category_tbl (
 );
 
 CREATE OR REPLACE VIEW term_category AS
-  select t.term, t.tid, t.rid, t.rtid, tc.category, tc.cat_rid, tc.cat_rtid from nif_term t left outer join term_category_tbl tc
+  select t.term, t.tid, t.rid, t.rtid, t.inferred, tc.category, tc.cat_rid, tc.cat_rtid from nif_term t left outer join term_category_tbl tc
   on (t.rid = tc.rid and t.rtid = tc.rtid);
 
 CREATE OR REPLACE FUNCTION fill_term_category(theKbid INTEGER, category_list_str TEXT) RETURNS VOID AS $$
@@ -108,6 +109,10 @@ BEGIN
     END LOOP;
 
   END LOOP;
+
+  -- fill inferred flag
+  UPDATE nif_term SET inferred = has_inferred_def(rid, rtid);
+  
   select into counter count(*) from nif_term;
   raise notice 'insert all terms and their ids. Count = %', counter;
 
