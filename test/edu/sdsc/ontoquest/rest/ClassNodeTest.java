@@ -5,11 +5,10 @@ import java.util.Set;
 
 import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.OntoquestTestAdapter;
-import edu.sdsc.ontoquest.rest.BaseBean.InputType;
 import edu.sdsc.ontoquest.rest.BaseBean.SiblingsType;
 
 /**
- * @version $Id: ClassNodeTest.java,v 1.1 2010-10-28 06:30:36 xqian Exp $
+ * @version $Id: ClassNodeTest.java,v 1.2 2011-07-12 18:00:00 xqian Exp $
  *
  */
 public class ClassNodeTest extends OntoquestTestAdapter {
@@ -17,7 +16,8 @@ public class ClassNodeTest extends OntoquestTestAdapter {
   String kbName = "NIF";
   int kbId = -1;
   
-  public void setUp() {
+  @Override
+	public void setUp() {
     super.setUp();
     attributes = new HashMap<String, Object>();
     try {
@@ -37,15 +37,6 @@ public class ClassNodeTest extends OntoquestTestAdapter {
     }
   }
 
-  public void testGetByName() throws OntoquestException {
-    String name = "sao313023570;GO_0009179;birnlex_1146;birnlex_1566;birnlex_1489;birnlex_1118;birnlex_1567;birnlex_911";
-    Set<ClassNode> classNodes = ClassNode.getByName(name, kbId, context);
-    for (ClassNode c : classNodes) {
-      System.out.println(c.getLabel() + "; " + c.getName());
-//      assertEquals(c.getName(), name);
-    }    
-  }
-  
   public void testGetByLabel() throws OntoquestException {
     String name = "Cerebellum";
     Set<ClassNode> classNodes = ClassNode.getByLabel(name, kbId, context);
@@ -55,15 +46,15 @@ public class ClassNodeTest extends OntoquestTestAdapter {
     }    
   }
   
-  public void testSearch() throws OntoquestException {
-    String term = "Cerebellum";
-    Set<ClassNode> classNodes = ClassNode.search(term, attributes, kbId, context);
+  public void testGetByName() throws OntoquestException {
+    String name = "sao436474611;GO_0009179;birnlex_1146;birnlex_1566;birnlex_1489;birnlex_1118;birnlex_1567;birnlex_911";
+    Set<ClassNode> classNodes = ClassNode.getByName(name, kbId, context);
     for (ClassNode c : classNodes) {
       System.out.println(c.getLabel() + "; " + c.getName());
-//      assertEquals(c.getLabel(), name);
+//      assertEquals(c.getName(), name);
     }    
   }
-
+  
   public void testGetSiblings() throws OntoquestException {
     Set<ClassNode> classNodes = null;
 //    classNodes= ClassNode.getSiblings("Cerebellum", SiblingsType.CLASSES, kbId, 
@@ -75,5 +66,14 @@ public class ClassNodeTest extends OntoquestTestAdapter {
     for (ClassNode c : classNodes) {
       System.out.println(c.getLabel() + "; " + c.getName());
     }
+  }
+
+  public void testSearch() throws OntoquestException {
+    String term = "Cerebellum";
+    Set<ClassNode> classNodes = ClassNode.search(term, attributes, kbId, context);
+    for (ClassNode c : classNodes) {
+      System.out.println(c.getLabel() + "; " + c.getName());
+//      assertEquals(c.getLabel(), name);
+    }    
   }
 }
