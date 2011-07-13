@@ -11,149 +11,161 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: BaseBean.java,v 1.1 2010-10-28 06:29:53 xqian Exp $
+ * @version $Id: BaseBean.java,v 1.2 2011-07-13 12:15:43 xqian Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
  * 
  */
 public abstract class BaseBean {
-  public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL }
-  public enum SiblingsType { CLASSES, PARTS }
-  
-  public enum InputType { OID, NAME, TERM }
+	public enum InputType { OID, NAME, TERM }
+	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL }
 
-  private static ArrayList<Variable> varList8 = null;
-  private static ArrayList<Variable> varList3 = null;
-  private static ArrayList<Variable> varList1 = null;
-  private static HashSet<String> definitionPropertySet = null;
-  private static HashSet<String> labelPropertySet = null;
-//  private static HashSet<String> externalSourcePropertySet = null;
-  private static HashSet<String> synonymPropertySet = null;
-  private static BasicFunctions basicFunctions = DbBasicFunctions.getInstance();
+	public enum SiblingsType { CLASSES, PARTS }
 
-  public abstract Element toXml(Document doc);
+	private static ArrayList<Variable> varList8 = null;
+	private static ArrayList<Variable> varList4 = null;
+	private static ArrayList<Variable> varList3 = null;
+	private static ArrayList<Variable> varList1 = null;
+	private static HashSet<String> definitionPropertySet = null;
+	private static HashSet<String> labelPropertySet = null;
+	//  private static HashSet<String> externalSourcePropertySet = null;
+	private static HashSet<String> synonymPropertySet = null;
+	private static BasicFunctions basicFunctions = DbBasicFunctions.getInstance();
 
-  private static synchronized void setVarLists() {
-    varList1 = new ArrayList<Variable>(1);
-    varList1.add(new Variable("v1", 1));
-    
-    varList3 = new ArrayList<Variable>(3);
-    varList3.add(new Variable("v1", 1));
-    varList3.add(new Variable("v2", 1));
-    varList3.add(new Variable("v3", 1));
+	/**
+	 * @return the basicFunctions
+	 */
+	public static BasicFunctions getBasicFunctions() {
+		return basicFunctions;
+	}
 
-    varList8 = new ArrayList<Variable>(8);
-    varList8.add(new Variable("v1", 1));
-    varList8.add(new Variable("v2", 1));
-    varList8.add(new Variable("v3", 1));
-    varList8.add(new Variable("v4", 1));
-    varList8.add(new Variable("v5", 1));
-    varList8.add(new Variable("v6", 1));
-    varList8.add(new Variable("v7", 1));
-    varList8.add(new Variable("v8", 1));   
-  }
-  
-  private static synchronized void setDefinitionPropertySet() {
-    
-    // initialize definitionPropertyMap
-    definitionPropertySet = new HashSet<String>();
-    definitionPropertySet.add("definition");
-    definitionPropertySet.add("description");
-    definitionPropertySet.add("externallySourcedDefinition");
-    definitionPropertySet.add("birnlexDefinition");
-    definitionPropertySet.add("birnlexComment");
-    definitionPropertySet.add("comment");
-    definitionPropertySet.add("tempDefinition");
+	/**
+	 * @return the definitionPropertySet
+	 */
+	public static HashSet<String> getDefinitionPropertySet() {
+		if (definitionPropertySet == null)
+			setDefinitionPropertySet();
+		return definitionPropertySet;
+	}
 
-  }
+	public static HashSet<String> getLabelPropertySet() {
+		if (labelPropertySet == null)
+			setLabelPropertySet();
+		return labelPropertySet;
+	}
 
-  private static synchronized void setLabelPropertySet() {
-    labelPropertySet = new HashSet<String>();
-    labelPropertySet.add("label");
-    labelPropertySet.add("prefLabel");
-  }
-  
-//  private static synchronized void setExternalSourcePropertySet() {
-//    externalSourcePropertySet = new HashSet<String>();
-//    externalSourcePropertySet.add("externalSourceURI");
-//    externalSourcePropertySet.add("hasExternalSource");
-//  }
-  
-  private static synchronized void setSynonymPropertySet() {
-    synonymPropertySet = new HashSet<String>();
-    synonymPropertySet.add("synonym"); 
-    synonymPropertySet.add("abbrev");
-    synonymPropertySet.add("hasExactSynonym"); 
-    synonymPropertySet.add("hasRelatedSynonym"); 
-    synonymPropertySet.add("acronym"); 
-    synonymPropertySet.add("altLabel"); 
-    synonymPropertySet.add("taxonomicCommonName"); 
-    synonymPropertySet.add("ncbiTaxScientificName"); 
-    synonymPropertySet.add("ncbiTaxGenbankCommonName"); 
-    synonymPropertySet.add("ncbiTaxBlastName"); 
-    synonymPropertySet.add("ncbiIncludesName"); 
-    synonymPropertySet.add("ncbiInPartName"); 
-    synonymPropertySet.add("hasNarrowSynonym"); 
-    synonymPropertySet.add("misspelling"); 
-    synonymPropertySet.add("misnomer"); 
-    synonymPropertySet.add("hasBroadSynonym"); 
-  }
+	/**
+	 * @return the synonymPropertySet
+	 */
+	public static HashSet<String> getSynonymPropertySet() {
+		if (synonymPropertySet == null)
+			setSynonymPropertySet();
+		return synonymPropertySet;
+	}
 
-  /**
-   * @return the varList8
-   */
-  public static ArrayList<Variable> getVarList8() {
-    if (varList8 == null)
-      setVarLists();
-    return varList8;
-  }
+	//  private static synchronized void setExternalSourcePropertySet() {
+	//    externalSourcePropertySet = new HashSet<String>();
+	//    externalSourcePropertySet.add("externalSourceURI");
+	//    externalSourcePropertySet.add("hasExternalSource");
+	//  }
 
-  public static ArrayList<Variable> getVarList3() {
-    if (varList3 == null)
-      setVarLists();
-    return varList3;
-  }
-  
-  public static ArrayList<Variable> getVarList1() {
-    if (varList1 == null)
-      setVarLists();
-    return varList1;
-  }
-  
-  /**
-   * @return the definitionPropertySet
-   */
-  public static HashSet<String> getDefinitionPropertySet() {
-    if (definitionPropertySet == null)
-      setDefinitionPropertySet();
-    return definitionPropertySet;
-  }
-  
-  public static HashSet<String> getLabelPropertySet() {
-    if (labelPropertySet == null)
-      setLabelPropertySet();
-    return labelPropertySet;
-  }
+	public static ArrayList<Variable> getVarList1() {
+		if (varList1 == null)
+			setVarLists();
+		return varList1;
+	}
 
-//  public static HashSet<String> getExternalSourcePropertySet() {
-//    if (externalSourcePropertySet == null)
-//      setExternalSourcePropertySet();
-//    return externalSourcePropertySet;
-//  }
-  
-  /**
-   * @return the basicFunctions
-   */
-  public static BasicFunctions getBasicFunctions() {
-    return basicFunctions;
-  }
+	public static ArrayList<Variable> getVarList3() {
+		if (varList3 == null)
+			setVarLists();
+		return varList3;
+	}
 
-  /**
-   * @return the synonymPropertySet
-   */
-  public static HashSet<String> getSynonymPropertySet() {
-    if (synonymPropertySet == null)
-      setSynonymPropertySet();
-    return synonymPropertySet;
-  }
+	public static ArrayList<Variable> getVarList4() {
+		if (varList4 == null)
+			setVarLists();
+		return varList4;
+	}
+	/**
+	 * @return the varList8
+	 */
+	public static ArrayList<Variable> getVarList8() {
+		if (varList8 == null)
+			setVarLists();
+		return varList8;
+	}
+
+	private static synchronized void setDefinitionPropertySet() {
+
+		// initialize definitionPropertyMap
+		definitionPropertySet = new HashSet<String>();
+		definitionPropertySet.add("definition");
+		definitionPropertySet.add("description");
+		definitionPropertySet.add("externallySourcedDefinition");
+		definitionPropertySet.add("birnlexDefinition");
+		definitionPropertySet.add("birnlexComment");
+		definitionPropertySet.add("comment");
+		definitionPropertySet.add("tempDefinition");
+
+	}
+
+	private static synchronized void setLabelPropertySet() {
+		labelPropertySet = new HashSet<String>();
+		labelPropertySet.add("label");
+		labelPropertySet.add("prefLabel");
+	}
+
+	private static synchronized void setSynonymPropertySet() {
+		synonymPropertySet = new HashSet<String>();
+		synonymPropertySet.add("synonym"); 
+		synonymPropertySet.add("abbrev");
+		synonymPropertySet.add("hasExactSynonym"); 
+		synonymPropertySet.add("hasRelatedSynonym"); 
+		synonymPropertySet.add("acronym"); 
+		synonymPropertySet.add("altLabel"); 
+		synonymPropertySet.add("taxonomicCommonName"); 
+		synonymPropertySet.add("ncbiTaxScientificName"); 
+		synonymPropertySet.add("ncbiTaxGenbankCommonName"); 
+		synonymPropertySet.add("ncbiTaxBlastName"); 
+		synonymPropertySet.add("ncbiIncludesName"); 
+		synonymPropertySet.add("ncbiInPartName"); 
+		synonymPropertySet.add("hasNarrowSynonym"); 
+		synonymPropertySet.add("misspelling"); 
+		synonymPropertySet.add("misnomer"); 
+		synonymPropertySet.add("hasBroadSynonym"); 
+	}
+
+	//  public static HashSet<String> getExternalSourcePropertySet() {
+	//    if (externalSourcePropertySet == null)
+	//      setExternalSourcePropertySet();
+	//    return externalSourcePropertySet;
+	//  }
+
+	private static synchronized void setVarLists() {
+		varList1 = new ArrayList<Variable>(1);
+		varList1.add(new Variable("v1", 1));
+
+		varList3 = new ArrayList<Variable>(3);
+		varList3.add(new Variable("v1", 1));
+		varList3.add(new Variable("v2", 1));
+		varList3.add(new Variable("v3", 1));
+
+		varList4 = new ArrayList<Variable>(4);
+		varList4.add(new Variable("v1", 1));
+		varList4.add(new Variable("v2", 1));
+		varList4.add(new Variable("v3", 1));
+		varList4.add(new Variable("v4", 1));
+
+		varList8 = new ArrayList<Variable>(8);
+		varList8.add(new Variable("v1", 1));
+		varList8.add(new Variable("v2", 1));
+		varList8.add(new Variable("v3", 1));
+		varList8.add(new Variable("v4", 1));
+		varList8.add(new Variable("v5", 1));
+		varList8.add(new Variable("v6", 1));
+		varList8.add(new Variable("v7", 1));
+		varList8.add(new Variable("v8", 1));   
+	}
+
+	public abstract Element toXml(Document doc);
 }

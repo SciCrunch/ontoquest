@@ -66,6 +66,9 @@
   		<searchNameLike>
 			select name from (:0) t1 :6 order by d limit :7;	
   		</searchNameLike>
+  		<searchNameLike2>
+			select name, d from (:0) t1,  :6 order by d limit :7;	
+  		</searchNameLike2>
   		<!-- Explanation:
   		     * :1 - the query string in lower case. 
   		     * :2 - condition on kb. See explanation at bottom of the file.
