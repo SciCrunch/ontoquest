@@ -11,6 +11,7 @@ import org.restlet.data.Form;
 import org.restlet.data.Reference;
 import org.restlet.ext.json.JsonRepresentation;
 import org.restlet.representation.Representation;
+import org.restlet.representation.StringRepresentation;
 import org.restlet.resource.Get;
 import org.restlet.resource.ResourceException;
 
@@ -21,13 +22,26 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 /**
  * Google Refine Reconcile Services
  * <p>
- * $Id: SearchReconcileResource.java,v 1.1 2011-07-13 12:15:41 xqian Exp $
+ * $Id: SearchReconcileResource.java,v 1.2 2011-08-02 17:33:16 xqian Exp $
  * 
  */
 public class SearchReconcileResource extends BaseResource {
 	protected final String KEY_IS_SINGLE = "is_single";
 	private List<SearchReconcileBean> singleSearchResult = null;
 	private HashMap<String, List<SearchReconcileBean>> multipleSearchResult = null;
+	private SearchReconcileMetaData metaData = null;
+	private String callback = null;
+
+	private JSONObject convertMetaData(SearchReconcileMetaData metaData) throws JSONException {
+		JSONObject result = new JSONObject();
+		result.put("name", metaData.getName());
+		result.put("identifierSpace", metaData.getIdentifierSpace());
+		result.put("schemaSpace", metaData.getSchemaSpace());
+
+		JSONObject view = new JSONObject().put("url", metaData.getViewURL());
+		result.put("view", view);
+		return result;
+	}
 
 	private JSONObject convertMultipleResults(
 			Map<String, List<SearchReconcileBean>> beanMap) throws JSONException {
@@ -51,7 +65,9 @@ public class SearchReconcileResource extends BaseResource {
 		}
 		JSONObject result = new JSONObject().put("result", array);
 		return result;
-	}	@Override
+	}
+
+	@Override
 	protected void doInit() throws ResourceException {
 		try {
 			OntoquestApplication application = (OntoquestApplication) getApplication();
@@ -66,13 +82,23 @@ public class SearchReconcileResource extends BaseResource {
 				kbId = basicFunctions.getKnowledgeBaseID(kbName, getOntoquestContext());
 			}
 
+			String callback = (String) getRequest().getAttributes().get("callback");
+			if (callback != null) {
+				metaData = new SearchReconcileMetaData();
+				this.callback = callback;
+				return;
+			}
+
 			String query = (String) getRequest().getAttributes().get("query");
 			if (query != null) {
 				query = Reference.decode(query);
 				JSONObject queryObj = parseQuery(query);
 				search(queryObj, kbId);
+				return;
 			}
 
+			// default action
+			metaData = new SearchReconcileMetaData();
 		} catch (Throwable oe) {
 			setAppException(oe);
 			// throw new ResourceException(Status.SERVER_ERROR_INTERNAL,
@@ -120,7 +146,17 @@ public class SearchReconcileResource extends BaseResource {
 		try {
 
 			JSONObject result = null;
-			if (singleSearchResult != null)
+			if (metaData != null) {
+				result = convertMetaData(metaData);
+				String jsonText = result.toString();
+				StringBuilder finalResponse = new StringBuilder();
+				if (callback != null)
+					finalResponse.append(callback).append("(");
+				finalResponse.append(jsonText);
+				if (callback != null)
+					finalResponse.append(')');
+				return new StringRepresentation(finalResponse.toString());
+			} else if (singleSearchResult != null)
 				result = convertSingleResult(singleSearchResult);
 			else if (multipleSearchResult != null)
 				result = convertMultipleResults(multipleSearchResult);
@@ -134,4 +170,5 @@ public class SearchReconcileResource extends BaseResource {
 			return toErrorJSON();
 		}
 	}
+
 }

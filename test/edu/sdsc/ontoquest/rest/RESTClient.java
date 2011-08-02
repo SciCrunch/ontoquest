@@ -5,7 +5,7 @@ import org.restlet.resource.ClientResource;
 import edu.sdsc.ontoquest.OntoquestTestAdapter;
 
 /**
- * @version $Id: RESTClient.java,v 1.3 2011-07-13 12:15:47 xqian Exp $
+ * @version $Id: RESTClient.java,v 1.4 2011-08-02 17:33:17 xqian Exp $
  *
  */
 public class RESTClient extends OntoquestTestAdapter {
@@ -94,7 +94,15 @@ public class RESTClient extends OntoquestTestAdapter {
 	public void testSearchReconcile() throws Exception {
 		// run("http://localhost:8182/ontoquest/reconcile?query=cerebellum");
 		//		run("http://localhost:8182/ontoquest/reconcile?query={\"query\":\"golgi\", \"limit\":5, \"type\":\"\"}");
-		run("http://localhost:8182/ontoquest/reconcile?query={\"q0\":{\"query\":\"golgi\", \"limit\":5, \"type\":\"\"}, \"q1\":{\"query\":\"cerebellum\", \"limit\":3, \"type\":\"\"}}");
+		// run("http://localhost:8182/ontoquest/reconcile?query={\"q0\":{\"query\":\"golgi\", \"limit\":5, \"type\":\"\"}, \"q1\":{\"query\":\"cerebellum\", \"limit\":3, \"type\":\"\"}}");
+		run("http://nif-services.neuinfo.org/ontoquest/reconcile?query={\"q0\":{\"query\":\"golgi\", \"limit\":5, \"type\":\"\"}, \"q1\":{\"query\":\"cerebellum\", \"limit\":3, \"type\":\"\"}}");
+	}
+
+	public void testSearchReconcileMetaData() throws Exception {
+		// run("http://localhost:8182/ontoquest/reconcile?query=cerebellum");
+		// run("http://localhost:8182/ontoquest/reconcile?query={\"query\":\"golgi\", \"limit\":5, \"type\":\"\"}");
+		run("http://localhost:8182/ontoquest/reconcile?callback=jsonp123");
+		// run("http://localhost:8182/ontoquest/reconcile");
 
 	}
 
