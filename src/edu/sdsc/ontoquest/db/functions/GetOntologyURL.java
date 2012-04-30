@@ -10,7 +10,7 @@ import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: GetOntologyURL.java,v 1.1 2010-10-28 06:30:14 xqian Exp $
+ * @version $Id: GetOntologyURL.java,v 1.2 2012-04-30 22:42:03 xqian Exp $
  *
  */
 public class GetOntologyURL implements OntoquestFunction<ResourceSet>{
@@ -40,7 +40,7 @@ public class GetOntologyURL implements OntoquestFunction<ResourceSet>{
       sb.deleteCharAt(sb.length()-1);
     args[0] = sb.toString();
     args[1] = String.valueOf(nodeIDs.length);
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get URL of the nodes -- " + args[0]);
   }
 

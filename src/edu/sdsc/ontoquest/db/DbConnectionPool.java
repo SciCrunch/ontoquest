@@ -11,7 +11,7 @@ import org.apache.commons.logging.LogFactory;
 
 /**
  * A simple database connection pool.
- * @version $Id: DbConnectionPool.java,v 1.1 2010-10-28 06:30:09 xqian Exp $
+ * @version $Id: DbConnectionPool.java,v 1.2 2012-04-30 22:43:04 xqian Exp $
  */
 public class DbConnectionPool {
 
@@ -129,4 +129,6 @@ public class DbConnectionPool {
       }
       return con;
     }
+    
+    public String getDbURL() { return _url; }
   }

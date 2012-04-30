@@ -3,11 +3,10 @@ package edu.sdsc.ontoquest.rest;
 import java.util.HashMap;
 import java.util.List;
 
-import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.OntoquestTestAdapter;
 
 /**
- * @version $Id: TermResourceTest.java,v 1.1 2010-10-28 06:30:36 xqian Exp $
+ * @version $Id: TermResourceTest.java,v 1.2 2012-04-30 22:45:03 xqian Exp $
  *
  */
 public class TermResourceTest extends OntoquestTestAdapter {
@@ -15,7 +14,8 @@ public class TermResourceTest extends OntoquestTestAdapter {
   int kbid = 0;
   String kbName = "NIF";
   
-  public void setUp() {
+  @Override
+	public void setUp() {
     super.setUp();
     attributes = new HashMap<String, Object>();
     try {

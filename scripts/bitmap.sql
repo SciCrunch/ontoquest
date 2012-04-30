@@ -1,4 +1,4 @@
-/*
+﻿
 DROP TYPE IF EXISTS bm_bitvector CASCADE;
 
 create type bm_bitvector as (
@@ -30,7 +30,7 @@ create type bm_run as (
   fill boolean,
   vec integer[]
 );
-*/
+
 
 DROP AGGREGATE IF EXISTS bm_and(bm_bitvector) CASCADE;
 

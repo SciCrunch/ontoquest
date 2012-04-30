@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION split_index(idx_str VARCHAR) 
+﻿CREATE OR REPLACE FUNCTION split_index(idx_str VARCHAR) 
   RETURNS SETOF id_typ AS $$
 /*
   Given a dewey index, e.g. 0.3.67.18.324, split it by dilimiter ".", and return the ancestors as a set of integers.
@@ -84,7 +84,7 @@ CREATE OR REPLACE FUNCTION encode_index(tbl_name VARCHAR, id1 INTEGER, ori_id IN
 
     EXECUTE 'select t1.prev, t2.idx, t1.idx from '||tbl_name||' t1, '||tbl_name ||' t2 where t1.id = '||id1||
       ' and t1.prev = t2.id ' INTO prev_id, prev_idx, curr_idx;
-
+--raise notice 'WWWWWWW prev_id = %, prev_idx = %, curr_idx = %', prev_id, prev_idx, curr_idx;
     IF prev_id IS NULL THEN
       RAISE EXCEPTION 'Found an unconnected node. Severe error! DAG tree table is %, id is %', tbl_name, id1;
     END IF;
@@ -199,24 +199,30 @@ CREATE OR REPLACE FUNCTION compute_dag_index_private(sql TEXT, kbid INTEGER, pid
     -- id: unique id for node (rid, rtid); idx: dewey index string; dist: distance used by MST; prev: previous node in tree
     EXECUTE 'drop table if exists '||idx_tbl_name||' cascade ';
     EXECUTE 'drop table if exists '||sspi_tbl_name||' cascade ';
-
+--raise notice 'FFFFFFFFFFFFFFFF';
     EXECUTE 'create table '||idx_tbl_name||' (id serial PRIMARY KEY, rid integer, rtid integer, '
       ||'idx varchar(511), desc_count integer[10], anc_count integer[10], dist integer, prev integer, known boolean default false)';
+raise notice 'DDDDDDDDDDDDDDDDDD';
+
     -- id1: id in idx_tbl_name (node1); idx1: idx str of node1, make a copy here for convenience.
     EXECUTE 'create table '||sspi_tbl_name||' (id1 integer, idx1 varchar(511), id2 integer, idx2 varchar(511), 
       rtype char(1) CHECK (rtype in (''p'', ''a'')))';
+raise notice 'EEEEEEEEEEEEEEEEE';
 
     EXECUTE 'comment on column '||idx_tbl_name||'.desc_count is ''Store the counts of descendants up to level 9. the first element is count of all descendants. The 2nd int is the count at level 1. The 3rd is the count at level 1 and 2, and so on.''';
 
     EXECUTE 'comment on column '||idx_tbl_name||'.anc_count is ''Store the counts of ancestors up to level 9. the first element is count of all ancestors. The 2nd int is the count at level 1. The 3rd is the count at level 1 and 2, and so on.''';
 
     EXECUTE 'comment on table '||sspi_tbl_name||' is ''Store the branching edges (type p) and branch ancestor pair (type a). id2 is the parent/branch ancestor of id1.''';
-    
+raise notice 'IIIIIIIIIIIIIIIIIIII';
+
     -- add a row in meta data table
     INSERT INTO DAG_INDEX_METADATA VALUES (tbl_id, kbid, pid, include_subproperties::boolean, no_hidden::boolean, idx_tbl_name, sspi_tbl_name, sql);
+--raise notice 'JJJJJJJJJJJJJJJJJJJJJJJJ';
 
     -- create an artificial root to guarantee single root
     EXECUTE 'insert into '|| idx_tbl_name||' values (0, 0, 0, ''0'', null, null, 0, null)';
+raise notice 'SQL = %', sql;
     
     -- load graph into dag_temp and idx_tbl_name
     OPEN curs1 FOR EXECUTE sql;
@@ -254,10 +260,13 @@ CREATE OR REPLACE FUNCTION compute_dag_index_private(sql TEXT, kbid INTEGER, pid
             raise exception 'No root can be found in the input graph. Please check if the graph is not a directed acyclic graph (DAG)';
         END IF;
     END IF;
+raise notice 'AAAAAAAAAAAAAAAAA';
 
     -- start MST procedure
     -- initialize dist column (max dist = 2^31), except dist[root] = 0 (default).
     EXECUTE 'update '||idx_tbl_name||' set dist = 2^31-1 where id != 0';
+raise notice 'BBBBBBBBBBBBBBB';
+
 
     -- iterate nodes
     <<loop3>>
@@ -271,8 +280,8 @@ CREATE OR REPLACE FUNCTION compute_dag_index_private(sql TEXT, kbid INTEGER, pid
       EXECUTE 'UPDATE '||idx_tbl_name||' SET known = true where id = '||nid2;
 
       -- iterate current node's neighbors, update their distance.
-      <<loop4>>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   
-      FOR nid1 IN select id1 from dag_temp where id2 = nid2 and dag_id = tbl_id
+      <<loop4>>
+	  FOR nid1 IN select id1 from dag_temp where id2 = nid2 and dag_id = tbl_id
       LOOP
         EXECUTE 'select dist from '||idx_tbl_name||' where id = '||nid1 INTO dist1;
         IF dist2-1 < dist1 THEN
@@ -282,31 +291,26 @@ CREATE OR REPLACE FUNCTION compute_dag_index_private(sql TEXT, kbid INTEGER, pid
       END LOOP loop4;
 
     END LOOP loop3;
+ raise notice 'JJJJJJJJJJJJJJJ';
+ 
     -- encoding dewey index.
-    FOR nid1, idx1_str IN EXECUTE 'select id, idx from '||idx_tbl_name
+    FOR nid1, idx1_str IN EXECUTE 'select id, idx from '||idx_tbl_name ||' order by dist DESC'
     LOOP
       IF idx1_str IS NULL THEN
-        perform encode_index(idx_tbl_name, nid1);
+		perform encode_index(idx_tbl_name, nid1);
       END IF;
     END LOOP;
+raise notice 'KKKKKKKKKKKKKKKKK';
 
     -- add extra edges into sspi table, the type is p.
     FOR nid1, idx1_str, nid2, idx2_str IN EXECUTE 'select i1.id, i1.idx, i2.id, i2.idx from dag_temp t, '
      ||idx_tbl_name||' i1, '|| idx_tbl_name||' i2 where i1.id = t.id1 and i2.id = t.id2 and t.dag_id = '
      || tbl_id ||' and position(i2.idx in i1.idx) = 0'
     LOOP
-/*      IF position(idx1_str in idx2_str) = 1 THEN
-        perform delete_dag_index(tbl_id);
-        execute 'delete from dag_temp where dag_id = '||tbl_id;
-        
-        RAISE EXCEPTION 'The input graph contains cycle! The edge to form cycle is from %(idx=%) to %(idx=%)', 
-          nid1, idx1_str, nid2, idx2_str;
-      END IF;
--- cycle detection is done at encode_index step.
-*/      
       EXECUTE 'insert into '||sspi_tbl_name||' values ('||nid1||', '''||idx1_str||''', '||nid2||', '''||idx2_str||
         ''', ''p'')';
     END LOOP;
+raise notice '????????????????//';
 
     -- add branching pairs into sspi table. A branching node is a node that has more than one parent.
     -- say X and Y are branching nodes, X is an ancestor of Y, and there is no other branching nodes between X and Y,
@@ -382,7 +386,7 @@ CREATE OR REPLACE FUNCTION compute_dag_surrogate_pred(dag_id integer, tree_tbl v
     -- -- unprocessedNodes := ARRAY(select distinct id1 from sspi_tbl);
     FOR nid1 IN EXECUTE 'select distinct id1 from '||sspi_tbl
     LOOP
---raise notice 'add into array: %', nid1;
+raise notice 'add into array: %', nid1;
       unprocessedNodes := array_append(unprocessedNodes, nid1); 
     END LOOP;
 
@@ -394,18 +398,19 @@ CREATE OR REPLACE FUNCTION compute_dag_surrogate_pred(dag_id integer, tree_tbl v
       FOR idx1, nid2, idx2 IN EXECUTE 'select t1.idx as idx1, id2, t2.idx as idx2 from dag_temp d, '||tree_tbl
         ||' t1, '||tree_tbl ||' t2 where d.id1 = '||unprocessedNodes[i]||' and d.id1 = t1.id and d.id2 = t2.id'
       LOOP
---raise notice '(i, id1, idx1, id2, idx2) = (%, %, %, %, %)', i, unprocessedNodes[i], idx1, nid2, idx2;
+raise notice '(i, id1, idx1, id2, idx2) = (%, %, %, %, %)', i, unprocessedNodes[i], idx1, nid2, idx2;
         done := false;
         -- for every parent, check if it is a branching node
         WHILE NOT done LOOP
           EXECUTE 'SELECT 1 FROM '||sspi_tbl||' where id1 = '||nid2||' and rtype = ''p''' INTO tmp;
           IF tmp IS null OR tmp != 1 THEN
---raise notice 'go up...';
+raise notice 'go up...';
             -- the predecessor node is not a branching node, go up to check its parent.
             EXECUTE 'select id2, t.idx as idx2 from dag_temp d, '||tree_tbl||' t where d.id1 = '||nid2
             ||' and d.id2 = t.id' INTO nid2, idx2;
+raise notice 'new nid2 = %, idx2 = %', nid2, idx2;
           ELSE
---raise notice 'found NBA';
+raise notice 'found NBA';
             -- found nearest branching ancestor, put into sspi_tbl
             EXECUTE 'insert into '||sspi_tbl||' values ('||unprocessedNodes[i]||', '''||idx1||''', '
               || nid2||', '''||idx2||''', ''a'')';

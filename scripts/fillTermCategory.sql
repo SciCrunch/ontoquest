@@ -10,6 +10,8 @@ CREATE TABLE nif_term (
   rid integer,
   rtid integer,
   inferred boolean,
+  is_acronym boolean,
+  is_abbrev boolean,
   primary key (rid, rtid, term)
 );
 
@@ -25,7 +27,7 @@ CREATE TABLE term_category_tbl (
 );
 
 CREATE OR REPLACE VIEW term_category AS
-  select t.term, t.tid, t.rid, t.rtid, t.inferred, tc.category, tc.cat_rid, tc.cat_rtid from nif_term t left outer join term_category_tbl tc
+  select t.term, t.tid, t.rid, t.rtid, t.inferred, t.is_acronym, t.is_abbrev, tc.category, tc.cat_rid, tc.cat_rtid from nif_term t left outer join term_category_tbl tc
   on (t.rid = tc.rid and t.rtid = tc.rtid);
 
 CREATE OR REPLACE FUNCTION fill_term_category(theKbid INTEGER, category_list_str TEXT) RETURNS VOID AS $$
@@ -100,11 +102,14 @@ BEGIN
       END LOOP;
     END IF;
 
+--raise notice 'synPropIDs = %', synPropIDs;
+
   -- fill out tid and term
   FOR rec1 IN select rid, rtid, name from graph_nodes where kbid = theKbid and rtid = 1 and name != 'Thing' --limit 50
   LOOP
-    FOR rec2 IN select distinct name2 from get_neighborhood(ARRAY[[rec1.rid, rec1.rtid]], synPropIDs, null, false,1,true,false, false,false)
+    FOR rec2 IN select distinct name2 from get_neighborhood(ARRAY[[rec1.rid, rec1.rtid]], synPropIDs, null, false,1,true,false, false,false) where name2 is not null
     LOOP
+ --raise notice 'rec2.name2=%, rec1.name=%, rid=%, rtid=%', rec2.name2, rec1.name, rec1.rid, rec1.rtid;
       insert into nif_term (term, tid, rid, rtid) values (rec2.name2, rec1.name, rec1.rid, rec1.rtid);
     END LOOP;
 
@@ -112,9 +117,24 @@ BEGIN
 
   -- fill inferred flag
   UPDATE nif_term SET inferred = has_inferred_def(rid, rtid);
+
+  -- fill the is_acronym flag (Xufei, 03.2012)
+  UPDATE nif_term t set is_acronym = (select true from relationship r, literal l, property p where r.propertyid = p.id and p.name = 'acronym' and 
+	r.subjectid = t.rid and r.subject_rtid = t.rtid and r.objectid = l.id and r.object_rtid = 13 and l.lexicalform = t.term);
+
+  UPDATE nif_term t set is_acronym = false where is_acronym is null;
+
+  -- fill the is_abbrev flag (Xufei, 04.2012)
+  UPDATE nif_term t set is_abbrev = (select true from relationship r, literal l, property p where r.propertyid = p.id and p.name = 'abbrev' and 
+	r.subjectid = t.rid and r.subject_rtid = t.rtid and r.objectid = l.id and r.object_rtid = 13 and l.lexicalform = t.term);
+
+  UPDATE nif_term t set is_abbrev = false where is_abbrev is null;
+
+
+  DELETE FROM nif_term where term = '';
   
   select into counter count(*) from nif_term;
-  raise notice 'insert all terms and their ids. Count = %', counter;
+--  raise notice 'insert all terms and their ids. Count = %', counter;
 
   -- create hierarchy in input categories. Put the hierarchy in temporary table tmp_cat_tree
   -- first, iterate category pairs. For every pair, check if there exist ancestor-descendant relationship.
@@ -133,7 +153,7 @@ BEGIN
     insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid) select distinct rid1, rtid1, rec1.desc_rid, rec1.desc_rtid 
       from get_neighborhood(rec1.desc_rid, rec1.desc_rtid, subclassPid, false, 0, true, false, true, true) t, nif_term nt
       where t.rid1 = nt.rid and t.rtid1 = nt.rtid;
-    raise notice 'add all descendants of category %, %', rec1.desc_rid, rec1.desc_rtid;
+--    raise notice 'add all descendants of category %, %', rec1.desc_rid, rec1.desc_rtid;
   END LOOP;
 
   -- For every (rid, rtid, cat_rid, cat_rtid) pair, get category (cat_rid, cat_rtid)'s superclasses (sc_rid, sc_rtid), 
@@ -143,7 +163,7 @@ BEGIN
    delete from term_category_tbl tc1 where (rid, rtid, cat_rid, cat_rtid) in (select tc2.rid, tc2.rtid, ne.rid2, ne.rtid2 
       from term_category_tbl tc2, get_neighborhood(rec2.desc_rid, rec2.desc_rtid, subclassPid, false, 0, true, 
       false, true, false) ne where tc2.cat_rid = rec2.desc_rid and tc2.cat_rtid = rec2.desc_rtid);
-    raise notice 'delete redundant descendants of category %, %', rec2.desc_rid, rec2.desc_rtid;
+--    raise notice 'delete redundant descendants of category %, %', rec2.desc_rid, rec2.desc_rtid;
   END LOOP;
 
   -- fill the label for categories
@@ -152,7 +172,7 @@ BEGIN
     tc.cat_rtid = e.rtid1);
 
   update term_category_tbl set category = get_name(cat_rid, cat_rtid, true, null) where category is null;
-  raise notice 'category label is updated';
+--  raise notice 'category label is updated';
 
   EXECUTE 'drop table tmp_cat_tree';
 END;

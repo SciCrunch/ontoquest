@@ -10,7 +10,7 @@ import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: EstimateNeighborCount.java,v 1.1 2010-10-28 06:30:10 xqian Exp $
+ * @version $Id: EstimateNeighborCount.java,v 1.2 2012-04-30 22:42:03 xqian Exp $
  *
  */
 public class EstimateNeighborCount implements OntoquestFunction<ResourceSet> {
@@ -98,7 +98,7 @@ public class EstimateNeighborCount implements OntoquestFunction<ResourceSet> {
     args[5] = String.valueOf(allowSubproperties);
     args[6] = String.valueOf(isSynonymIncluded);
 
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get neighbor count of term(s)("+args[0]+") (kbid="+kbid+")");
 
   }
@@ -122,7 +122,7 @@ public class EstimateNeighborCount implements OntoquestFunction<ResourceSet> {
     args[5] = DbUtility.formatArrayToSingleQuotedStr(includedProperties);
     args[6] = String.valueOf(kbid);
 
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get neighbor count of term(s)("+args[0]+") (kbid="+kbid+")");
 
   }

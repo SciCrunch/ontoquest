@@ -15,7 +15,7 @@ import edu.sdsc.ontoquest.query.Variable;
  * If a named class (input class) has an equivalent anonymous class which 
  * is defined as some kind of restriction or set class, the result is true.
  * False other wise. 
- * <p>@version $Id: CheckInferredDefinition.java,v 1.1 2010-10-28 06:30:13 xqian Exp $
+ * <p>@version $Id: CheckInferredDefinition.java,v 1.2 2012-04-30 22:42:02 xqian Exp $
  *
  */
 public class CheckInferredDefinition implements OntoquestFunction<ResourceSet> {
@@ -58,7 +58,7 @@ public class CheckInferredDefinition implements OntoquestFunction<ResourceSet> {
       sb.deleteCharAt(sb.length()-1);
     args[0] = sb.toString();
 
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to check inferred classes of term IDs ("+args[0]+")");
   }
   
@@ -69,7 +69,7 @@ public class CheckInferredDefinition implements OntoquestFunction<ResourceSet> {
     args[0] = DbUtility.toQuotedString(terms);
     args[1] = String.valueOf(isSynonymIncluded);
     args[2] = String.valueOf(kbid);
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to check inferred classes of term IDs ("+args[0]+")");
   }
 }

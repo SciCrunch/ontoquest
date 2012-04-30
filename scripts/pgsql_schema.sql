@@ -16,3 +16,7 @@
 \i dagFuns.sql
 
 \i computeGoodnessScore.sql
+
+\i bitmap.sql
+
+\i fillTermCategory.sql

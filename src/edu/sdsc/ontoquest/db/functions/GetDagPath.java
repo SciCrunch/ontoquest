@@ -10,7 +10,7 @@ import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: GetDagPath.java,v 1.1 2010-10-28 06:30:11 xqian Exp $
+ * @version $Id: GetDagPath.java,v 1.2 2012-04-30 22:42:03 xqian Exp $
  *
  */
 public class GetDagPath implements OntoquestFunction<ResourceSet> {
@@ -50,7 +50,7 @@ public class GetDagPath implements OntoquestFunction<ResourceSet> {
     args[4] = String.valueOf(pid);
     args[5] = String.valueOf(allowSubproperties);
     args[6] = String.valueOf(excludeHiddenRelationship);
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get path between node 1 (rid="+rid1+", rtid="+rtid1+") and node 2(rid="
         +rid2+", rtid="+rtid2+")");
 

@@ -9,7 +9,7 @@ import edu.sdsc.ontoquest.ResourceSet;
 import junit.framework.TestCase;
 
 /**
- * @version $Id: GetSuperClassesTest.java,v 1.1 2010-10-28 06:30:03 xqian Exp $
+ * @version $Id: GetSuperClassesTest.java,v 1.2 2012-04-30 22:45:02 xqian Exp $
  *
  */
 public class GetSuperClassesTest extends OntoquestTestAdapter {
@@ -39,7 +39,7 @@ public class GetSuperClassesTest extends OntoquestTestAdapter {
     }
   }
   public void testExecute() throws OntoquestException {
-    nodeIDs.add(new int[]{649226, 1});
+//    nodeIDs.add(new int[]{649226, 1});
     for (int[] nodeID : nodeIDs) {
       OntoquestFunction<ResourceSet> f = new GetSuperClasses(nodeID[0], nodeID[1], kbid, 0, false);
       System.out.println("Find superclasses of node (rid, rtid): " + nodeID[0] + ", " + nodeID[1]);

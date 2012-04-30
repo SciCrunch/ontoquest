@@ -1,5 +1,8 @@
 ﻿/* TABLES AND ROUTINES for NIF Card application. 
     Usage: call fill_nif_cards()
+	
+   ROUTINES for filling NIF organism labels.
+    Usage: call replace_nif_label('NIF', 'nlx_organ_110506', 'altLabel');
 */
 
 DROP TABLE IF EXISTS nif_brain_region_all cascade;
@@ -263,4 +266,55 @@ $$ LANGUAGE plpgsql;
 --select fill_nif_cards();
 
 --select bc.*, r.label from nif_brain_cell_all bc, nif_brain_region_all r where bc.brain_region_id = r.id order by cell_id;
+
+CREATE OR REPLACE FUNCTION replace_nif_label(kbName VARCHAR, term VARCHAR, label_prop VARCHAR) RETURNS void AS $$
+  DECLARE
+    theKbid INTEGER;
+    rec RECORD;
+  BEGIN 
+    SELECT id INTO theKbid FROM kb where name = kbName;
+
+    FOR rec IN select e.rid1, e.rtid1, n.label from graph_edges e, property p, graph_nodes n, 
+      (select * from get_neighborhood(''''||term||'''', '''subClassOf''', null, theKbid, false, 0, true, true, true, false, true)) t
+      where p.id = e.pid and p.name = label_prop and e.rid1 = t.rid1 and e.rtid1 = t.rtid1 and e.rid2 = n.rid and e.rtid2 = n.rtid 
+    LOOP
+      update graph_nodes_all set label = rec.label where rid = rec.rid1 and rtid = rec.rtid1;
+    END LOOP;
+
+    RETURN;
+  END;
+$$ LANGUAGE plpgsql; 
+
+select replace_nif_label('NIF', 'nlx_organ_110506', 'altLabel');
+
+-- Some of the sub-ontologies are converted from OBO. Some instances of "Synonym" are obsolete. Remove those.
+CREATE OR REPLACE FUNCTION nif_clean_obo (theKbid integer)
+  RETURNS boolean AS $$
+  DECLARE
+    rec RECORD;
+  BEGIN
+  
+	-- select "Synonym" class and its instances that have no other relationship.
+	FOR rec IN select theRid, theRtid from relationship r, 
+		(select instanceid as theRid, instance_rtid as theRtid from typeof t, primitiveclass pc 
+		where t.class_rtid = 1 and t.classid = pc.id and pc.browsertext = 'oboInOwl:Synonym' and pc.kbid = theKbid) i
+		where r.subjectid = i.theRid and r.subject_rtid = i.theRtid group by theRid, theRtid having count(r.propertyid) = 1
+	LOOP
+	   delete from graph_edges_all where rid1 = rec.theRid and rtid1 = rec.theRtid;
+	   delete from graph_nodes_all where rid = rec.theRid and rtid = rec.theRtid;		
+	   delete from typeof where instanceid = rec.theRid and instance_rtid = rec.theRtid;
+		
+	   delete from literal l where l.id in (select objectid from relationship r where r.subjectid = rec.theRid and r.subject_rtid = rec.theRtid and r.object_rtid = 13);
+		
+	   delete from relationship r where r.subjectid = rec.theRid and r.subject_rtid = rec.theRtid;
+		
+	   delete from individual where id = rec.theRid and rec.theRtid = 12;
+		
+	END LOOP;
+
+
+    RETURN true;
+
+  END;
+$$ LANGUAGE plpgsql;
 

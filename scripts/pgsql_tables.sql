@@ -109,6 +109,8 @@ select drop_if_exists('datatype');
  
 select drop_if_exists('hasvalue');
 
+select drop_if_exists('hasself');
+
 select drop_if_exists('primitiveclass');
  
 select drop_if_exists('property');
@@ -145,6 +147,8 @@ CREATE SEQUENCE alldifferent_seq;
 
 CREATE SEQUENCE datarange_seq;
 
+CREATE SEQUENCE datatype_restriction_seq;
+
 -- **************************
 -- META TABLES
 -- **************************
@@ -175,9 +179,10 @@ CREATE TABLE ontologyuri (
   id serial PRIMARY KEY,
   uri text NOT NULL,
   is_default boolean,
-  nsid integer NOT NULL REFERENCES namespace (id) ON DELETE CASCADE,
+  nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , document_uri text -- the location of ontology, may not be same as uri
 );
 
 CREATE INDEX ontologyuri_idx1 ON ontologyuri (kbid);
@@ -240,7 +245,7 @@ CREATE TABLE resourcetype (
   id integer PRIMARY KEY, 
   name varchar(64) NOT NULL,
   rtype varchar(1) NOT NULL,
-  CONSTRAINT resourcetype_chk CHECK (rtype IN ('a', 'b', 'c', 'd', 'h', 
+  CONSTRAINT resourcetype_chk CHECK (rtype IN ('a', 'b', 'c', 'd', 'e', 'f', 'h', 
   'i', 'k', 'l', 'm', 'n', 'o', 'p', 'r', 't', 'u', 'v', 'x', 'y'))
 );
 
@@ -270,6 +275,7 @@ CREATE TABLE property (
   nsid integer NOT NULL REFERENCES namespace (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE
   , browsertext text
+  , is_reflexive boolean default false
 );
 
 CREATE INDEX property_idx1 ON property (name);
@@ -316,6 +322,7 @@ CREATE TABLE subpropertyof (
   parentid integer NOT NULL REFERENCES property (id) ON DELETE CASCADE,
   inferred boolean default false,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE
+  , type char(1) check (type in ('a', 'd', 'o'))
 );
 
 CREATE INDEX sub_prop_idx1 ON subpropertyof (childid);
@@ -350,9 +357,10 @@ CREATE TABLE individual (
   name text NOT NULL,
   hashcode integer,
   is_owl boolean default true, -- is owl individual or rdfs individual?
-  nsid integer NOT NULL REFERENCES namespace (id) ON DELETE CASCADE,
+  nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , is_named boolean default true  -- is named or anonymous individual
 );
 
 CREATE INDEX individual_idx1 ON individual (hashcode);
@@ -451,6 +459,7 @@ CREATE TABLE allvaluesfromclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , type char(1) check (type in ('d', 'o')) -- d: data restriction, o: object restriction
 );
 
 CREATE INDEX allvalues_idx1 ON allvaluesfromclass (propertyid);
@@ -468,6 +477,7 @@ CREATE TABLE somevaluesfromclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , type char(1) check (type in ('d', 'o')) -- d: data restriction, o: object restriction
 );
 
 CREATE INDEX somevalues_idx1 ON somevaluesfromclass (propertyid);
@@ -483,6 +493,7 @@ CREATE TABLE cardinalityclass (
   cardinality integer NOT NULL,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
   browsertext text,
+  type char(1) check (type in ('d', 'o')),  -- d: dataCardinality o: objectCardinality
   constraint uk_card UNIQUE (id, propertyid, cardinality) 
 );
 
@@ -499,6 +510,7 @@ CREATE TABLE mincardinalityclass (
   mincardinality integer NOT NULL,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE, 
   browsertext text,
+  type char(1) check (type in ('d', 'o')),  -- d: dataCardinality o: objectCardinality
   constraint uk_mincard UNIQUE (id, propertyid, mincardinality) 
 );
 
@@ -515,6 +527,7 @@ CREATE TABLE maxcardinalityclass (
   maxcardinality integer NOT NULL,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
   browsertext text,
+  type char(1) check (type in ('d', 'o')),  -- d: dataCardinality o: objectCardinality
   constraint uk_maxc UNIQUE (id, propertyid, maxcardinality)
 );
 
@@ -531,6 +544,7 @@ CREATE TABLE complementclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , type char(1) check (type in ('d', 'o'))  -- d: dataCardinality o: objectCardinality
 );
 
 CREATE INDEX complement_idx1 ON complementclass (rtid, complementclassid);
@@ -545,6 +559,7 @@ CREATE TABLE intersectionclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
   browsertext text,
+  , type char(1) check (type in ('d', 'o'))  -- d: data o: object
   constraint uk_intersection UNIQUE (id, classid, rtid)
 );
 
@@ -562,6 +577,7 @@ CREATE TABLE unionclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
   browsertext text,
+  , type char(1) check (type in ('d', 'o'))  -- d: data o: object
   constraint uk_union UNIQUE (id, classid, rtid)
 );
 
@@ -571,6 +587,16 @@ CREATE INDEX union_idx2 ON unionclass (rtid, classid);
 
 CREATE INDEX union_idx3 ON unionclass (kbid);
 
+-- hasSelf
+CREATE TABLE hasself (
+  id serial PRIMARY KEY,
+  propertyid integer NOT NULL REFERENCES property (id) ON DELETE CASCADE,
+  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
+  , browsertext text
+);
+
+CREATE INDEX hasself_idx1 ON hasvalue (propertyid);
+
 -- owl:hasValue
 CREATE TABLE hasvalue (
   id serial PRIMARY KEY,
@@ -579,6 +605,7 @@ CREATE TABLE hasvalue (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , type char(1) check (type in ('d', 'o'))  -- d: dataCardinality o: objectCardinality
 );
 
 CREATE INDEX hasvalue_idx1 ON hasvalue (propertyid);
@@ -594,6 +621,7 @@ CREATE TABLE oneof (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
+  , type char(1) check (type in ('d', 'o'))  -- d: dataCardinality o: objectCardinality
 );
 
 CREATE INDEX oneof_idx1 ON oneof (id);
@@ -601,6 +629,24 @@ CREATE INDEX oneof_idx1 ON oneof (id);
 CREATE INDEX oneof_idx2 ON oneof (rtid, valueid);
 
 CREATE INDEX oneof_idx3 ON oneof (kbid);
+
+CREATE TABLE datatype_restriction (
+  id integer NOT NULL,
+  dtid integer NOT NULL REFERENCES datatype (id) ON DELETE CASCADE,
+  facetPropId integer NOT NULL REFERENCES property (id) ON DELETE CASCADE,
+  facetIRI varchar(100), 
+  literal_id integer NOT NULL REFERENCES literal (id) ON DELETE CASCADE,  
+  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
+  browsertext text  
+);
+
+CREATE INDEX dt_res_idx1 ON datatype_restriction (id);
+
+CREATE INDEX dt_res_idx2 ON datatype_restriction (dtid);
+
+CREATE INDEX dt_res_idx3 ON datatype_restriction (facetIRI);
+
+CREATE INDEX dt_res_idx4 ON datatype_restriction (kbid);
 
 -- ********************************
 -- END OF CLASS AND RESTRICTIONS
@@ -616,7 +662,9 @@ CREATE TABLE domain (
   propertyid integer NOT NULL REFERENCES property (id) ON DELETE CASCADE,
   domainid integer NOT NULL,
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
-  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
+  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE
+  , type char(1),
+  contraint domain_type_chk CHECK (type in ('a', 'd', 'o'))
 );
 
 CREATE INDEX domain_idx1 ON domain (propertyid);
@@ -648,6 +696,8 @@ CREATE TABLE range (
   rangeid integer NOT NULL,
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
+  , type char(1),
+  contraint range_type_chk CHECK (type in ('a', 'd', 'o'))
 );
 
 CREATE INDEX range_idx1 ON range (propertyid);
@@ -672,6 +722,7 @@ CREATE TABLE disjointclass (
   rtid2 integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   inferred boolean default false,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
+  , type char(1) check (type in ('c', 'd', 'o'))
 );
 
 CREATE INDEX disjoint_idx1 ON disjointclass (rtid1, classid1);
@@ -702,6 +753,7 @@ CREATE TABLE equivalentclass (
   class_rtid2 integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   inferred boolean default false,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
+  , type char(1) check (type in ('c', 'd', 'o'))
 );
 
 CREATE INDEX eqclass_idx1 ON equivalentclass (class_rtid1, classid1);
@@ -903,3 +955,7 @@ INSERT INTO resourcetype VALUES (17, 'alldifferentindividual', 'y');
 INSERT INTO resourcetype VALUES (18, 'ontologyuri', 'k');
 
 --INSERT INTO resourcetype VALUES (19, 'rdflist', 's');
+
+INSERT INTO resourcetype VALUES (20, 'hasself', 'f');
+
+INSERT INTO resourcetype VALUES (21, 'datatype_restriction', 'e');

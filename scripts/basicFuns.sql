@@ -768,6 +768,20 @@ CREATE OR REPLACE FUNCTION delete_kb(kbName VARCHAR)
   END;
 $$ LANGUAGE plpgsql;
 
+create or replace function str_aggregate(str1 text, str2 text) returns text as $$
+begin
+  if (length(str1) > 0 ) then
+    return str1 || ';' || str2;
+  else
+    return str2;
+  end if;
+end;
+$$ language 'plpgsql';
+
+-- create the aggregate function
+
+create aggregate stragg (basetype=text, sfunc=str_aggregate,
+stype=text, initcond='' );
 
 -- select (ARRAY[[158065, 1], [160218, 1]])[i][1] from generate_series(1,2) i;
 

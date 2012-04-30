@@ -328,7 +328,7 @@ CREATE OR REPLACE FUNCTION get_label(theRid INTEGER, theRtid INTEGER) RETURNS TE
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION set_labels(theKbid INTEGER) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION set_labels(theKbid INTEGER, setLabelFlag boolean) RETURNS VOID AS $$
   /*
      set labels for all nodes in graph_nodes_all table for the specified kbid. 
    */
@@ -341,15 +341,19 @@ CREATE OR REPLACE FUNCTION set_labels(theKbid INTEGER) RETURNS VOID AS $$
     i INTEGER;
   BEGIN
     -- clear old labels
-    update graph_nodes_all set label = null where kbid = theKbid;
+	IF setLabelFlag THEN
+		update graph_nodes_all set label = null where kbid = theKbid;
+	
+		-- iterate several assignment processes
+		FOR i IN 1..maxIteration LOOP
+		  perform set_label(rid, rtid, false) from graph_nodes_all where label is null and kbid = theKbid;
+		END LOOP;
 
-    -- iterate several assignment processes
-    FOR i IN 1..maxIteration LOOP
-      perform set_label(rid, rtid, false) from graph_nodes_all where label is null and kbid = theKbid;
-    END LOOP;
-
-    -- for rest of nodes, use recursive assignment.
-    perform set_label(rid, rtid, true) from graph_nodes_all where label is null and kbid = theKbid;
+		-- for rest of nodes, use recursive assignment.
+		perform set_label(rid, rtid, true) from graph_nodes_all where label is null and kbid = theKbid;
+	ELSE
+		perform set_label(rid, rtid, false) from graph_nodes_all where label is null and kbid = theKbid;
+	END IF;
 
     -- if there are still unsigned label, use name
     update graph_nodes_all set label = name where label is null and kbid = theKbid;
@@ -399,6 +403,93 @@ CREATE OR REPLACE FUNCTION set_obsolete_flag (theKbid INTEGER) RETURNS VOID AS $
   END;
 $$ LANGUAGE plpgsql;
 
+CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer) 
+  RETURNS VOID AS $$
+  DECLARE
+    maxIteration INTEGER := 5;
+    j INTEGER;
+  BEGIN
+    -- loop several times to handle nested cases.
+	FOR j IN 1..maxIteration LOOP
+		-- insert inferred edge from intersection class.
+		-- e.g. X -- subclassOf/equivalent -> (intersectionOf(A, B, C)) will generate:
+		-- X subclassOf/equivalent A, X subClassOf/equivalent B, X subClassOf/equivalent C
+		INSERT INTO graph_edges_all select distinct e.rid1, e.rtid1, e.pid, i.classid, i.rtid, e.kbid, true, false,
+		null as restriction_type, null as restriction_stmt
+		from graph_edges_all e, intersectionclass i, resourcetype rt
+		where e.rid2 = i.id and e.rtid2 = rt.id and rt.rtype = 'x' and e.kbid = theKbid
+		and not exists(select * from graph_edges_all e2 where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 and e.pid =e2.pid
+		and i.classid = e2.rid2 and i.rtid = e2.rtid2);
+		
+		-- insert inferred edge from allValuesFrom class.
+		-- e.g. Wine -- subclassOf/equivalent/intersectionOf -> (something --:forall:hasMaker-> Winery) will generate:
+		-- Wine -- :forall:hasMaker -> Winery
+		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
+        from allvaluesfromclass t, graph_edges s, resourcetype rt, property p
+        where s.rid2 = t.id and s.rtid2 = rt.id and rt.rtype = 'v' and s.pid = p.id and p.name in ('equivalentClass', 'subClassOf', 'intersectionOf')
+        and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+        and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
+        and not exists(select * from graph_edges_all e2 where s.rid1=e2.rid1 and s.rtid1=e2.rtid1 and t.propertyid=e2.pid
+        and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2) and s.kbid = theKbid;
+		  
+		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
+      from somevaluesfromclass t, graph_edges s, resourcetype rt, property p
+      where s.rid2 = t.id and s.rtid2 = rt.id and rt.rtype = 'v' and s.pid = p.id and p.name in ('equivalentClass', 'subClassOf', 'intersectionOf')
+      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+      and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
+      and not exists(select * from graph_edges_all e2 where s.rid1=e2.rid1 and s.rtid1=e2.rtid1 and t.propertyid=e2.pid
+          and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2) and s.kbid = theKbid;		
+		
+	END LOOP;
+ 
+	-- for equivalent classes (A equivalentClass B) and all edges involved A (A rel X), add edges B rel X in edge table. Similar for X rel A. Vice versa.
+	INSERT INTO graph_edges_all select e1.rid2 as rid1, e1.rtid2 as rtid1, e2.pid, e2.rid2, e2.rtid2, e2.kbid, 
+	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
+	from graph_edges_all e1, property p, property p2, graph_edges_all e2 where e1.rid1 = e2.rid1 and e1.rtid1 = e2.rtid1 
+	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false
+	and not exists(select * from graph_edges_all e3 where e1.rid2=e3.rid1 and e1.rtid2=e3.rtid1 and e2.pid=e3.pid) 
+	and e2.kbid = theKbid;
+
+	INSERT INTO graph_edges_all select e1.rid1 as rid1, e1.rtid1 as rtid1, e2.pid, e2.rid2, e2.rtid2, e2.kbid, 
+	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
+	from graph_edges_all e1, property p, property p2, graph_edges_all e2 where e1.rid2 = e2.rid1 and e1.rtid2 = e2.rtid1 
+	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false
+	and not exists(select * from graph_edges_all e3 where e1.rid1=e3.rid1 and e1.rtid1=e3.rtid1 and e2.pid=e3.pid)
+	and e2.kbid = theKbid;
+
+	INSERT INTO graph_edges_all select e2.rid1 as rid1, e2.rtid1 as rtid1, e2.pid, e1.rid2, e1.rtid2, e2.kbid, 
+	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
+	from graph_edges_all e1, property p, property p2, graph_edges_all e2 where e1.rid1 = e2.rid2 and e1.rtid1 = e2.rtid2 
+	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false 
+	and not exists(select * from graph_edges_all e3 where e2.rid1=e3.rid1 and e2.rtid1=e3.rtid1 and e2.pid=e3.pid)
+	and e2.kbid = theKbid;
+
+	INSERT INTO graph_edges_all select e2.rid1 as rid1, e2.rtid1 as rtid1, e2.pid, e1.rid1, e1.rtid1, e2.kbid, 
+	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
+	from graph_edges_all e1, property p, property p2, graph_edges_all e2 where e1.rid2 = e2.rid2 and e1.rtid2 = e2.rtid2 
+	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false 
+	and not exists(select * from graph_edges_all e3 where e2.rid1=e3.rid1 and e2.rtid1=e3.rtid1 and e2.pid=e3.pid)
+	and e2.kbid = theKbid;
+	
+	-- an extra check to remove those subClassOf edges which are not properly defined. 
+	-- e.g. if someone improperly declared A subClassOf B, A equivalentClass B, we will have cycles after adding
+	-- inference edges. In this case, we shall remove inference edges.
+	DELETE FROM graph_edges_all e1 where pid in (select id from property where name = 'subClassOf' and kbid=theKbid) 
+	and exists (select * from graph_edges e2 where e1.pid = e2.pid and
+	e1.rid1 = e2.rid2 and e1.rtid1 = e2.rtid2 and e1.rid2 = e2.rid1 and e1.rtid2 = e2.rtid2) and derived = true;
+  END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_graph(theKbid integer) 
+  RETURNS BOOLEAN AS $$
+  DECLARE
+    result boolean := false;
+  BEGIN
+    select update_graph(theKbid, true) into result;
+	return result;
+  END;
+$$ LANGUAGE plpgsql;
+
 /*
   Transform an owl knowledge base to a graph easy to view. Node table as 6 columns: rid, rtid, name, label, kbid, is_anonymous.
   Node name is class name, e.g. sao1065676773. Node label is the value of rdfs:label, e.g. hippocampus.
@@ -437,6 +528,8 @@ $$ LANGUAGE plpgsql;
      "one of (<class1>, <class2>, ...)" as label. For instance, "one of (Rat elderly, Rat late elderly, Rat early elderly)".
   *) add allDifferentIndividual as anonymous nodes. Use "All Different Individual" as name, use
      "AllDifferent {<individual1>, <individual2>, ...}" as label. For instance, "AllDifferent {birn_annot:ABA_app, birn_annot:BAMS_app}".
+  *) add hasSelf as anonymous node. Use "hasSelf class" as node name. Its browsertext as label.
+  *) add datatype_restriction as anonymous node. Use "Datatype restriction" as node name. Its browsertext as label.
   
   Notice that some class' labels cannot be set unless its member classes get the labels. So the label assigning 
   process runs recursively until all labels are set. To speed up the process, I run a procedure 5 times to assign labels 
@@ -484,7 +577,7 @@ $$ LANGUAGE plpgsql;
   *) update status of some hidden edges. If a restriction appears as object of another non-hidden edge (edge A), 
      set the corresponding restriction edge (edge B) to non-hidden. Otherwise, edge A cannot be reached. 
 */
-CREATE OR REPLACE FUNCTION update_graph(theKbid integer) 
+CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean) 
   RETURNS BOOLEAN AS $$
 
   DECLARE
@@ -494,11 +587,47 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
     onPropertyRtid integer;
     rdfTypeRid integer;
     rdfTypeRtid integer;
+	owlNSID integer;
+	rdfNSID integer;
   BEGIN
     -- clean up existing nodes and edges
     DELETE FROM graph_edges_all where kbid = theKbid;
     DELETE FROM graph_nodes_all where kbid = theKbid;
     raise notice 'Clean up graph_edges_all and graph_nodes_all table.';
+
+    SELECT p.id, rt.id INTO owlRestrictionRid, owlRestrictionRtid FROM primitiveclass p, resourcetype rt where p.name = 'Restriction' and rt.rtype = 'c' and is_system = true and kbid = theKbid;
+
+	SELECT id into owlNSID from namespace where prefix = 'owl:' and kbid = theKbid;
+
+	IF owlRestrictionRid is null OR owlRestrictionRid <= 0 THEN
+		
+		INSERT INTO primitiveclass (name,is_system,is_owlclass,is_deprecated,nsid,kbid,browsertext) values (
+		'Restriction', true, false, false, owlNSID, theKbid, 'owl:Restriction') RETURNING id into owlRestrictionRid;
+		
+		SELECT rt.id into owlRestrictionRtid from resourcetype rt where rt.rtype = 'c';
+	END IF;
+	
+    SELECT p.id, rt.id INTO onPropertyRid, onPropertyRtid FROM property p, resourcetype rt where p.name = 'onProperty' and rt.rtype = 'p' and is_system = true and kbid = theKbid;
+
+	IF onPropertyRid is null OR onPropertyRid <= 0 THEN
+		INSERT INTO property (name,is_object,is_owl,is_system,nsid,kbid,browsertext) values (
+		'onProperty', false, false, true, owlNSID,theKbid, 'owl:onProperty'
+		) RETURNING id INTO onPropertyRid;
+		
+		SELECT rt.id into onPropertyRtid from resourcetype rt where rt.rtype = 'p';
+	END IF;
+	
+ 	SELECT id into rdfNSID from namespace where prefix = 'rdf:' and kbid = theKbid;
+
+	SELECT p.id, rt.id INTO rdfTypeRid, rdfTypeRtid FROM property p, resourcetype rt where p.name = 'type' and rt.rtype = 'p' and is_system = true and kbid = theKbid;
+
+	IF rdfTypeRid is null OR rdfTypeRid  <= 0 THEN
+		INSERT INTO property (name,is_object,is_owl,is_system,nsid,kbid,browsertext) values (
+		'type', false, false, true, rdfNSID,theKbid, 'rdf:type'
+		) RETURNING id INTO rdfTypeRid;
+		
+		SELECT rt.id into rdfTypeRtid from resourcetype rt where rt.rtype = 'p';
+	END IF;
 
     -- insert primitive classes into nodes table
     INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, r.name, null, kbid, false, false, get_ontology(r.id, rt.id)
@@ -508,7 +637,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
 
     -- insert individuals into nodes table
     INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, r.name, null, kbid, false, false, get_ontology(r.id, rt.id)
-      FROM individual r, resourcetype rt WHERE kbid = theKbid and is_owl = true
+      FROM individual r, resourcetype rt WHERE kbid = theKbid --and is_owl = true
       and rt.name = 'individual';
     raise notice 'Added all individuals as nodes.';
 
@@ -547,12 +676,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
       where r.name = 'onProperty' and is_system = true and rt.rtype = 'p' and kbid = theKbid RETURNING rid, rtid INTO onPropertyRid, onPropertyRtid;
     raise notice 'Added owl:onProperty as special node.';
 */
-    SELECT p.id, rt.id INTO owlRestrictionRid, owlRestrictionRtid FROM primitiveclass p, resourcetype rt where p.name = 'Restriction' and rt.rtype = 'c' and is_system = true and kbid = theKbid;
-
-    SELECT p.id, rt.id INTO onPropertyRid, onPropertyRtid FROM property p, resourcetype rt where p.name = 'onProperty' and rt.rtype = 'p' and is_system = true and kbid = theKbid;
-
-    SELECT p.id, rt.id INTO rdfTypeRid, rdfTypeRtid FROM property p, resourcetype rt where p.name = 'type' and rt.rtype = 'p' and is_system = true and kbid = theKbid;
-
+	
     -- insert hasValue classes
     INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'hasValue class', 'something '||n.label||' as '||n2.label as label, r.kbid, true, false, null
       FROM hasValue r, resourcetype rt, resourcetype rt2, graph_nodes_all n, graph_nodes_all n2 
@@ -561,60 +685,70 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
     raise notice 'Added hasValue classes as nodes.';
 
     -- insert datarange classes
-    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, r.browsertext, null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, r.browsertext, r.browsertext, kbid, true, false, null
       FROM datarange r, resourcetype rt WHERE kbid = theKbid and rt.name = 'datarange';
     raise notice 'Added datarange classes as nodes.';
 
     -- insert cardinality classes
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Cardinality Restriction', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Cardinality Restriction', r.browsertext, kbid, true, false, null
       FROM cardinalityclass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'cardinalityclass';
     raise notice 'Added cardinality classes as nodes.';
 
     -- insert minCardinality classes
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Min Cardinality Restriction', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Min Cardinality Restriction', r.browsertext, kbid, true, false, null
       FROM mincardinalityclass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'mincardinalityclass';
     raise notice 'added minCardinality classes as nodes.';
     
     -- insert maxCardinality classes
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Max Cardinality Restriction', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Max Cardinality Restriction', r.browsertext, kbid, true, false, null
       FROM maxcardinalityclass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'maxcardinalityclass';
     raise notice 'added maxCardinality classes as nodes.';
     
     -- insert someValuesFrom classes
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'SomeValuesFrom Restriction', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'SomeValuesFrom Restriction', r.browsertext, kbid, true, false, null
       FROM someValuesFromClass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'somevaluesfromclass';
     raise notice 'added someValuesFrom classes as nodes.';
 
     -- insert allValuesFrom classes
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'AllValuesFrom Restriction', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'AllValuesFrom Restriction', r.browsertext, kbid, true, false, null
       FROM allValuesFromClass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'allvaluesfromclass';
     raise notice 'added allValuesFrom classes as nodes.';
 
     -- insert complement classes
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Complement class', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'Complement class', r.browsertext, kbid, true, false, null
       FROM complementclass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'complementclass';
     raise notice 'added complement classes as nodes.';
     
     -- insert union classes into nodes table
-    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'Union Class', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'Union Class', r.browsertext, kbid, true, false, null
       FROM unionclass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'unionclass';
     raise notice 'added union classes as nodes.';
 
     -- insert intersection classes into nodes table
-    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'Intersection Class', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'Intersection Class', r.browsertext, kbid, true, false, null
       FROM intersectionclass r, resourcetype rt WHERE kbid = theKbid and rt.name = 'intersectionclass';
     raise notice 'added intersection classes as nodes.';
     
     -- insert oneOf classes
-    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'Enumeration Class', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'Enumeration Class', r.browsertext, kbid, true, false, null
       FROM oneof r, resourcetype rt WHERE kbid = theKbid and rt.name = 'oneof';
     raise notice 'added oneOf classes as nodes.';
     
     -- insert allDifferentIndividual classes
-    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'All Different Individuals', null, kbid, true, false, null
+    INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, 'All Different Individuals', r.browsertext, kbid, true, false, null
       FROM alldifferentindividual r, resourcetype rt WHERE kbid = theKbid and rt.name = 'alldifferentindividual';
     raise notice 'added allDifferentIndividual classes as nodes.';
 
+	-- insert hasSelf classes
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'hasSelf class', r.browsertext as label, r.kbid, true, false, null
+      FROM hasSelf r, resourcetype rt where r.kbid = theKbid and rt.name = 'hasself';
+    raise notice 'Added hasSelf classes as nodes.';
+
+	-- insert datatype restriction classes
+	INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, 'datatype restriction', r.browsertext as label, r.kbid, true, false, null
+		FROM datatype_restriction r, resourcetype rt where r.kbid = theKbid and rt.name = 'datatype_restriction';
+   raise notice 'Added datatype restrictions as nodes.';
+		
     -- insert all ontology uri classes
     INSERT INTO graph_nodes_all SELECT distinct r.id as rid, rt.id as rtid, r.uri, r.uri, kbid, false, false, null
       FROM ontologyuri r, resourcetype rt WHERE kbid = theKbid and rt.name = 'ontologyuri';
@@ -730,6 +864,14 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
 
     raise notice 'added Virtuoso-style triplets about hasValue restrictions';
 
+    -- insert Virtuoso-style triplets about hasself restrictions
+    INSERT INTO graph_edges_all select t.id, 20, rdfTypeRid, owlRestrictionRid, owlRestrictionRtid, t.kbid, true, false, 
+      null as restriction_type, null as restriction_stmt from hasself t where t.kbid = theKbid;
+      
+    INSERT INTO graph_edges_all select t.id, 20, onPropertyRid, t.propertyid, 15, t.kbid, true, false, 
+      null as restriction_type, null as restriction_stmt from hasself t where t.kbid = theKbid;
+
+    raise notice 'added Virtuoso-style triplets about hasSelf restrictions';
 
     -- insert domain and range edges. Treat domain as subject (source) and range as object (target).
     -- If a property has domain restriction, but no range, use owl:Thing as range. 
@@ -806,15 +948,16 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
       and t.kbid = theKbid;
     raise notice 'added intersectionOf relationships as edges.';
 
+	/*
     -- insert inferred edge from intersection class.
-    -- e.g. X -- subclassOf -> (intersectionOf(A, B, C)) will generate:
-    -- X subclassOf A, X subClassOf B, X subClassOf C
+    -- e.g. X -- subclassOf/equivalent -> (intersectionOf(A, B, C)) will generate:
+    -- X subclassOf/equivalent A, X subClassOf/equivalent B, X subClassOf/equivalent C
     INSERT INTO graph_edges_all select distinct e.rid1, e.rtid1, e.pid, i.classid, i.rtid, e.kbid, true, false,
 	null as restriction_type, null as restriction_stmt
 	from graph_edges_all e, intersectionclass i, resourcetype rt
 	where e.rid2 = i.id and e.rtid2 = rt.id and rt.rtype = 'x' and e.kbid = theKbid;
     raise notice 'added derived intersectionOf relationships as edges.';
-
+*/
     -- insert oneOf edges from oneof table.
     INSERT INTO graph_edges_all select distinct t.id, rt.id as rtid1, p.id as pid, t.valueid, t.rtid, t.kbid, false, false,
       null as restriction_type, null as restriction_stmt
@@ -841,6 +984,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
       and t.kbid = theKbid;
     raise notice 'added allValuesFrom relationships as hidden edges.';
 
+	/*
     -- insert inferred edge from allValuesFrom class.
     -- e.g. Wine -- subclassOf -> (something --:forall:hasMaker-> Winery) will generate:
     -- Wine -- :forall:hasMaker -> Winery
@@ -853,6 +997,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
           and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2)
       and t.kbid = theKbid;
     raise notice 'added inferred subclassOf-allValuesFrom relationships as edges.';
+*/
 
     -- insert Virtuoso-style triplets about allValuesFrom restrictions
     INSERT INTO graph_edges_all select t.id, 2, rdfTypeRid, owlRestrictionRid, owlRestrictionRtid, t.kbid, true, false, 
@@ -875,6 +1020,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
       and t.kbid = theKbid;
     raise notice 'added someValuesFrom relationships as hidden edges.';
 
+	/*
     -- insert derived edge from someValuesFrom class, similar to those derived allValuesFrom edges.
     INSERT INTO graph_edges_all select distinct s.childid, s.child_rtid, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
       from somevaluesfromclass t, subclassof s, resourcetype rt
@@ -885,7 +1031,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
           and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2)
       and t.kbid = theKbid;
     raise notice 'added inferred subclassOf-someValuesFrom relationships as edges.';
-
+	*/
+	
     -- insert Virtuoso-style triplets about someValuesFrom restrictions
     INSERT INTO graph_edges_all select t.id, 3, rdfTypeRid, owlRestrictionRid, owlRestrictionRtid, t.kbid, true, false, 
       null as restriction_type, null as restriction_stmt from somevaluesfromclass t where t.kbid = theKbid;
@@ -961,12 +1108,27 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
       and t.kbid = theKbid;
     raise notice 'added subclassOf-maxCardinality relationships as edges.';
     
+	-- insert datatype restriction as edges.
+/*	INSERT INTO graph_edges_all select t.dtid, rt.id as rtid1, t.facetPropId, t.literal_id, rt2.id as rtid2, t.kbid, true, false, 'd', 'datatype'
+	  from datatype_restriction t, resourcetype rt, resourcetype rt2
+	  where rt.rtype = 'd' and rt2.rtype = 'l' and t.kbid = theKbid; */
+	  
+	INSERT INTO graph_edges_all select t.id as rid1, rt.id as rtid1, p.id as pid, t.dtid, rt2.id as rtid2,  t.kbid, true, false, 'd', 'datatype'
+	  from datatype_restriction t, resourcetype rt, resourcetype rt2, property p
+	  where rt.rtype = 'e' and rt2.rtype = 'd' and p.name = 'onDatatype' and p.kbid = t.kbid and t.kbid = theKbid;
+
+	INSERT INTO graph_edges_all select t.id as rid1, rt.id as rtid1, t.facetPropId as pid, t.literal_id, rt2.id as rtid2,  t.kbid, true, false, 'd', 'datatype'
+	  from datatype_restriction t, resourcetype rt, resourcetype rt2
+	  where rt.rtype = 'e' and rt2.rtype = 'l' and t.kbid = theKbid;
+	  
     -- for inversedOf property, add its inversed edge
     INSERT INTO graph_edges_all select distinct g.rid2, g.rtid2, ip.propertyid2 as pid, g.rid1, g.rtid1, g.kbid, true, g.hidden, g.restriction_type, g.restriction_stmt
       from graph_edges_all g, inversepropertyof ip where g.pid = ip.propertyid1 and g.kbid = theKbid and not exists (select * from graph_edges_all g2 where g2.rid1 = g.rid2 and
       g2.rtid1 = g.rtid2 and g2.pid = ip.propertyid2 and g2.rid2 = g.rid1 and g2.rtid2 = g.rtid1 and g2.kbid = g.kbid);
     raise notice 'added inferred inversedOf relationships as edges';
 
+    perform update_inference_edges(theKbid);
+	
     -- update status of some hidden edges. If a restriction appears as object of another non-hidden edge, set the corresponding restriction edge to non-hidden.
     UPDATE graph_edges_all g1 set hidden = false where hidden = true and g1.rtid1 in 
       (select id from resourcetype where rtype in ('v', 'a', 'b', 'm', 'n', 'h'))
@@ -974,9 +1136,9 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer)
     raise notice 'updated the status of hidden edges.';
 
     -- update node labels.
-    perform set_labels(theKbid);
-    raise notice 'updated node labels.';
-    
+	perform set_labels(theKbid, setLabelFlag);
+	raise notice 'updated node labels.';
+ 	
     -- update is_obsolete flag.
     perform set_obsolete_flag(theKbid);
     raise notice 'obsolete flag is updated.';

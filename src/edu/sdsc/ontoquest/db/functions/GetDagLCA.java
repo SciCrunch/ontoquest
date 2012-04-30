@@ -10,7 +10,7 @@ import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: GetDagLCA.java,v 1.1 2010-10-28 06:30:12 xqian Exp $
+ * @version $Id: GetDagLCA.java,v 1.2 2012-04-30 22:42:02 xqian Exp $
  *
  */
 public class GetDagLCA implements OntoquestFunction<ResourceSet> {
@@ -52,7 +52,7 @@ public class GetDagLCA implements OntoquestFunction<ResourceSet> {
       args[1] = String.valueOf(pid);
       args[2] = String.valueOf(allowSubproperties);
       args[3] = String.valueOf(excludeHiddenRelationship);
-      return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+      return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
           "Failed to get the least common ancestor (LCA) of nodes: "+sb);
     }
 

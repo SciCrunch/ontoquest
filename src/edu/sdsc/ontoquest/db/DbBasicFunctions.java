@@ -17,7 +17,7 @@ import edu.sdsc.ontoquest.query.Utility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: DbBasicFunctions.java,v 1.1 2010-10-28 06:30:09 xqian Exp $
+ * @version $Id: DbBasicFunctions.java,v 1.2 2012-04-30 22:43:04 xqian Exp $
  *
  */
 public class DbBasicFunctions implements BasicFunctions {
@@ -79,14 +79,14 @@ public class DbBasicFunctions implements BasicFunctions {
       throws OntoquestException {
     
     String[] args = new String[]{String.valueOf(kbid)};
-    return DbUtility.executeSQLCommandName("query.scanClassRelationships", context, varList, args, 
+    return DbUtility.executeSQLQueryName("query.scanClassRelationships", context, varList, args, 
         "Failed to retrieve class relationships for knowledge base (id = " + kbid + ").");
   }
 
   public ResourceSet scanPropertyRelationships(int kbid, Context context,
       List<Variable> varList) throws OntoquestException {
     String[] args = new String[]{String.valueOf(kbid)};
-    return DbUtility.executeSQLCommandName("query.scanPropertyRelationships", context, varList, args, 
+    return DbUtility.executeSQLQueryName("query.scanPropertyRelationships", context, varList, args, 
         "Failed to retrieve class relationships for knowledge base (id = " + kbid + ").");
   }
 
@@ -99,7 +99,7 @@ public class DbBasicFunctions implements BasicFunctions {
       kbCondition = (kbCondition.length() > 0) ? kbCondition.substring("and ".length()) : "";
     }
     String[] args = {kbCondition};
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to scan all relationships.");
   }
   
@@ -110,7 +110,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[1] = String.valueOf(rtid);
     List<Variable> varList = new ArrayList<Variable>(1);
     varList.add(new Variable(1));
-    ResourceSet rs = DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    ResourceSet rs = DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Couldn't find resource name! resource id = "+rid + "; resource type id = " + rtid);
     String name = null;
     if (rs.next()) {
@@ -133,7 +133,7 @@ public class DbBasicFunctions implements BasicFunctions {
     varList.add(new Variable(1));
     varList.add(new Variable(1));
     varList.add(new Variable(1));
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Couldn't find resource names!");
   }
   
@@ -152,7 +152,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[1] = String.valueOf(rtid);
     List<Variable> varList = new ArrayList<Variable>(1);
     varList.add(new Variable(1));
-    ResourceSet rs = DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    ResourceSet rs = DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Couldn't find resource name! resource id = "+rid + "; resource type id = " + rtid);
     String name = null;
     if (rs.next()) {
@@ -175,7 +175,7 @@ public class DbBasicFunctions implements BasicFunctions {
     varList.add(new Variable(1));
     varList.add(new Variable(1));
     varList.add(new Variable(1));
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Couldn't find labels!");
   }
 
@@ -189,13 +189,13 @@ public class DbBasicFunctions implements BasicFunctions {
     args[1] = String.valueOf(rtid);
     args[2] = DbUtility.formatSQLString(pname);
     
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to fetch property value! property name = " + pname + 
         "; rid = "+rid +"; rtid = "+rtid);
   }
   
   public ResourceSet listKnowledgeBases(Context context, List<Variable> varList) throws OntoquestException {
-    return DbUtility.executeSQLCommandName("query.listKB", context, varList, 
+    return DbUtility.executeSQLQueryName("query.listKB", context, varList, 
         new String[]{}, "Unable to list all knowledge bases.");
   }
 
@@ -301,7 +301,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[5] = (maxEditDistance<=0)?"":" where d <= "+maxEditDistance;
     args[6] = (resultLimit<=0)?"ALL":String.valueOf(resultLimit);
     
-    return DbUtility.executeSQLCommand(sql, context, varList, args, 
+    return DbUtility.executeSQLQuery(sql, context, varList, args, 
         "Failed to search name :" + strToSearch);
   }
    
@@ -344,7 +344,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[5] = (maxEditDistance<=0)?"":" where d <= "+maxEditDistance;
     args[6] = (resultLimit<=0)?"ALL":String.valueOf(resultLimit);
     
-    return DbUtility.executeSQLCommand(sql, context, varList, args, 
+    return DbUtility.executeSQLQuery(sql, context, varList, args, 
         "Failed to search term :" + strToSearch);
   }
   
@@ -403,7 +403,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[2] = useNegation?"!~*":"~*";
     args[3] = (resultLimit==0)?"ALL":String.valueOf(resultLimit);
     
-    return DbUtility.executeSQLCommand(sql, context, varList, args, 
+    return DbUtility.executeSQLQuery(sql, context, varList, args, 
         "Failed to search name :" + strToSearch);
   }
 
@@ -437,7 +437,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[1] = composeKBArray(kbid);
     args[2] = (classOnly)?" where rtid = 1":"";
     args[3] = String.valueOf(useLabel);
-    return DbUtility.executeSQLCommandName("query.searchAllIDByName", context, varList, args, 
+    return DbUtility.executeSQLQueryName("query.searchAllIDByName", context, varList, args, 
         "Failed to find matched IDs for '"+queryStr+"'");
   }
   
@@ -497,7 +497,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[1] = String.valueOf(excludeOWLThing);
     args[2] = String.valueOf(prefLabel);
     
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to fetch root terms in knowledge base (kbid = " + kbid + ")");
   }
 
@@ -523,7 +523,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[2] = sb.toString();
     
     args[3] = String.valueOf(prefLabel);
-    return DbUtility.executeSQLCommandName("query.searchNameLike2", context, 
+    return DbUtility.executeSQLQueryName("query.searchNameLike2", context, 
         varList, args, "Failed to search name: " + strToSearch);
   }
 

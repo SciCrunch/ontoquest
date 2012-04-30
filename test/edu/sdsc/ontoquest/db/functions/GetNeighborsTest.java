@@ -18,7 +18,7 @@ import edu.sdsc.ontoquest.rest.Relationship;
 import junit.framework.TestCase;
 
 /**
- * @version $Id: GetNeighborsTest.java,v 1.1 2010-10-28 06:30:06 xqian Exp $
+ * @version $Id: GetNeighborsTest.java,v 1.2 2012-04-30 22:45:03 xqian Exp $
  *
  */
 public class GetNeighborsTest extends OntoquestTestAdapter {
@@ -191,7 +191,7 @@ public class GetNeighborsTest extends OntoquestTestAdapter {
   public void testGetMultiLevelNeighborsByLabel() throws OntoquestException {
     long time1 = System.currentTimeMillis();
     String[] includedProperties = new String[]{"subClassOf", "has_part"};
-    String[] terms = {"Neurons which activate muscle cells (MSH)."};
+    String[] terms = {"Cerebellum"};
 //    OntoquestFunction<ResourceSet> f = new GetNeighbors(terms, kbid, 
 //        null, null, true, GetNeighbors.EDGE_BOTH,
 //        true, true, 1, false);

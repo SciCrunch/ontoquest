@@ -13,7 +13,7 @@ import edu.sdsc.ontoquest.query.Variable;
  * A SQL wrapper which provides a way for external application to run a select SQL directly 
  * against the database.
  * 
- * @version $Id: RunSQL.java,v 1.1 2010-10-28 06:30:13 xqian Exp $
+ * @version $Id: RunSQL.java,v 1.2 2012-04-30 22:42:03 xqian Exp $
  *
  */
 public class RunSQL implements OntoquestFunction<ResourceSet> {
@@ -30,7 +30,7 @@ public class RunSQL implements OntoquestFunction<ResourceSet> {
   @Override
   public ResourceSet execute(Context context, List<Variable> varList)
       throws OntoquestException {
-    return DbUtility.executeSQLCommand(sql, context, varList, new String[]{}, 
+    return DbUtility.executeSQLQuery(sql, context, varList, new String[]{}, 
         "Failed to run user-supplied SQL query.");
   }
 
