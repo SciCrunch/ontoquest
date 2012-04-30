@@ -1,7 +1,7 @@
 package edu.sdsc.ontoquest.rest;
 
 /**
- * @version $Id: BaseResource.java,v 1.2 2011-07-13 12:15:42 xqian Exp $
+ * @version $Id: BaseResource.java,v 1.3 2012-04-30 22:44:13 xqian Exp $
  *
  */
 import java.io.IOException;
@@ -50,9 +50,11 @@ public abstract class BaseResource extends ServerResource {
 
 		try {
 			JSONObject errorObj = new JSONObject();
-			errorObj.put("error_type", ((OntoquestException) appException).getType()
+			if (appException instanceof OntoquestException)
+				errorObj.put("error_type", ((OntoquestException) appException).getType()
 					.name());
 			errorObj.put("error_message", appException.getMessage());
+			appException.printStackTrace();
 			JsonRepresentation representation = new JsonRepresentation(errorObj);
 			return representation;
 		} catch (Exception e) {

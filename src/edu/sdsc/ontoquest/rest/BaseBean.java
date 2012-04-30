@@ -11,7 +11,7 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: BaseBean.java,v 1.2 2011-07-13 12:15:43 xqian Exp $
+ * @version $Id: BaseBean.java,v 1.3 2012-04-30 22:44:13 xqian Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
  * 
@@ -23,7 +23,7 @@ public abstract class BaseBean {
 	public enum SiblingsType { CLASSES, PARTS }
 
 	private static ArrayList<Variable> varList8 = null;
-	private static ArrayList<Variable> varList4 = null;
+	private static ArrayList<Variable> varList5 = null;
 	private static ArrayList<Variable> varList3 = null;
 	private static ArrayList<Variable> varList1 = null;
 	private static HashSet<String> definitionPropertySet = null;
@@ -81,10 +81,10 @@ public abstract class BaseBean {
 		return varList3;
 	}
 
-	public static ArrayList<Variable> getVarList4() {
-		if (varList4 == null)
+	public static ArrayList<Variable> getVarList5() {
+		if (varList5 == null)
 			setVarLists();
-		return varList4;
+		return varList5;
 	}
 	/**
 	 * @return the varList8
@@ -150,11 +150,12 @@ public abstract class BaseBean {
 		varList3.add(new Variable("v2", 1));
 		varList3.add(new Variable("v3", 1));
 
-		varList4 = new ArrayList<Variable>(4);
-		varList4.add(new Variable("v1", 1));
-		varList4.add(new Variable("v2", 1));
-		varList4.add(new Variable("v3", 1));
-		varList4.add(new Variable("v4", 1));
+		varList5 = new ArrayList<Variable>(5);
+		varList5.add(new Variable("v1", 1));
+		varList5.add(new Variable("v2", 1));
+		varList5.add(new Variable("v3", 1));
+		varList5.add(new Variable("v4", 1));
+		varList5.add(new Variable("v5", 1));
 
 		varList8 = new ArrayList<Variable>(8);
 		varList8.add(new Variable("v1", 1));

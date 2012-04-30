@@ -6,6 +6,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.w3c.dom.Document;
@@ -14,10 +15,18 @@ import org.w3c.dom.Element;
 import edu.sdsc.ontoquest.Context;
 import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.ResourceSet;
+import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.db.functions.RunSQL;
 
 public class SearchReconcileBean extends BaseBean {
 
+	public static final String TYPE_STRICT_ANY = "any";
+	public static final String TYPE_STRICT_ALL = "all";
+	public static final String TYPE_STRICT_SHOULD = "should";
+
+	public static String DEFAULT_TYPE_STRICT = TYPE_STRICT_ANY;
+	
+	
 	public static HashMap<String, List<SearchReconcileBean>> doMultipleQueries(
 			JSONObject queries,
 			Map<String, Object> attributes, int kbId,
@@ -42,7 +51,19 @@ public class SearchReconcileBean extends BaseBean {
 		if (queryObj.has("limit")) {
 			limit = queryObj.optInt("limit");
 		}
+		
+		JSONArray types = null;
 
+		String typeStr = queryObj.optString("type");
+		if (typeStr != null) {
+			types = new JSONArray();
+			types.put(typeStr);
+		} else {
+			types = queryObj.optJSONArray("type");
+		}
+		
+		String typeStrict = queryObj.optString("type_restrict", DEFAULT_TYPE_STRICT);
+		
 		boolean beginWith = false;
 		Object bwObj = attributes.get("begin_with");
 		if (bwObj != null) {
@@ -62,24 +83,47 @@ public class SearchReconcileBean extends BaseBean {
 				// do nothing, use default
 			}
 		}
-		return getTerms(query, limit, beginWith, maxEditDistance, kbId, context);
+		return getTerms(query, limit, beginWith, maxEditDistance, types, typeStrict, kbId, context);
 
 	}
 	public static List<SearchReconcileBean> getTerms(String term, int resultLimit,
-			boolean beginWith, int maxEditDistance,
+			boolean beginWith, int maxEditDistance, JSONArray types, String typeStrict,
 			int kbId, Context context) throws OntoquestException {
 		String beginChar = beginWith ? "" : "%";
+		String typeFromStr = "";
+		String typeWhereStr = "";
+		
+		if (!typeStrict.equalsIgnoreCase(TYPE_STRICT_SHOULD) && !typeStrict.equalsIgnoreCase(TYPE_STRICT_ANY)) {
+			throw new OntoquestException(OntoquestException.Type.INPUT, "Unsupported type strict : " + typeStrict);
+		}
+		
+		if (types != null && types.length() > 0) {
+			StringBuilder st = new StringBuilder();
 
-		String sql = "select term, tid, category, d from (select * from (select distinct term, tid, category, editdistance('"
-			+ term + "', term) d from TERM_CATEGORY where lower(term) like '"
+			for (int i=0; i<types.length(); i++) {
+				try {
+					String type = types.getString(i).trim();
+					if (type.length() == 0) continue;
+					st.append('\'').append(DbUtility.formatSQLString(type)).append('\'').append(',');
+				} catch (Exception e){}
+			}
+			if (st.length() > 0) {
+				st.deleteCharAt(st.length()-1);
+				typeWhereStr = " and gn.rid = tc.cat_rid and gn.rtid = tc.cat_rtid and gn.name in (" + st.toString() + ") ";
+				typeFromStr = ", graph_nodes gn ";
+			}
+		}
+		
+		String sql = "select term, tid, n.name as cid, category, d from (select * from (select distinct term, tid, category, cat_rid, cat_rtid, editdistance('"
+			+ term + "', term) d from TERM_CATEGORY tc " + typeFromStr + " where lower(term) like '"
 			+ beginChar
 			+ term.toLowerCase()
-			+ "%') t1 where d <= "
+			+ "%'" + typeWhereStr + ") t1 where d <= "
 			+ maxEditDistance
-			+ " order by d limit " + resultLimit + ") t";
-		// System.out.println("SQL to search term: " + sql);
+			+ " order by d limit " + resultLimit + ") t, graph_nodes n where cat_rid = n.rid and cat_rtid = n.rtid";
+//System.out.println("SQL to search term: " + sql);
 		RunSQL f = new RunSQL(sql);
-		ResourceSet rs = f.execute(context, BaseBean.getVarList4());
+		ResourceSet rs = f.execute(context, BaseBean.getVarList5());
 		LinkedList<SearchReconcileBean> matchedTerms = new LinkedList<SearchReconcileBean>();
 		//			HashMap<String, Integer> tempMap = new HashMap<String, Integer>();
 
@@ -88,7 +132,7 @@ public class SearchReconcileBean extends BaseBean {
 			if (t.toLowerCase().startsWith("regional part of"))
 				continue;
 			SearchReconcileBean entry = new SearchReconcileBean(rs.getString(2), t,
-					rs.getString(3), 1 - rs.getInt(4) / (double) maxEditDistance);
+					rs.getString(3), rs.getString(4), 1 - rs.getInt(5) / (double) maxEditDistance);
 			matchedTerms.add(entry);
 		}
 		rs.close();
@@ -103,20 +147,30 @@ public class SearchReconcileBean extends BaseBean {
 
 	String label = "";
 
-	String category = "";
+	String categoryLabel = "";
 
+	String categoryName = "";
+	
+	public String getCategoryName() {
+		return categoryName;
+	}
+
+	public void setCategoryName(String categoryName) {
+		this.categoryName = categoryName;
+	}
 	boolean match = true;
 
 	public SearchReconcileBean(String name, String label,
-			String category, double score) throws OntoquestException {
+			String categoryName, String categoryLabel, double score) throws OntoquestException {
 		setLabel(label);
 		setName(name);
-		setCategory(category);
+		setCategoryName(categoryName);
+		setCategoryLabel(categoryLabel);
 		setScore(score);
 	}
 
-	public String getCategory() {
-		return category;
+	public String getCategoryLabel() {
+		return categoryLabel;
 	}
 
 	// public String getId() {
@@ -149,8 +203,8 @@ public class SearchReconcileBean extends BaseBean {
 
 
 
-	public void setCategory(String category) {
-		this.category = category;
+	public void setCategoryLabel(String categoryLabel) {
+		this.categoryLabel = categoryLabel;
 	}
 
 	// public void setId(String id) throws OntoquestException {
