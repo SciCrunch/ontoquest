@@ -13,7 +13,7 @@ import org.apache.commons.configuration.XMLConfiguration;
 
 /**
  * This singleton class contains several sub-configurations used by the system.
- * @version $Id: AllConfiguration.java,v 1.1 2010-10-28 06:30:01 xqian Exp $
+ * @version $Id: AllConfiguration.java,v 1.2 2012-04-30 22:47:13 xqian Exp $
  *
  */
 public class AllConfiguration {
@@ -98,4 +98,10 @@ public class AllConfiguration {
     }
     return f;   
   }
+  
+	public static String getFileAbsPath(String fileName)
+	throws Exception {
+		return getFile(fileName).getAbsolutePath();
+	}
+
 }
