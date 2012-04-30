@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<db_config type="PostgreSQL">
+	<cmd>
+		<delete_kb>delete from kb where name = ':1'</delete_kb>
+	</cmd>
+	<query>
+		<get_seq_nextval>select nextval(':1')</get_seq_nextval>
+	</query>
+	<sequence>
+		<allvaluesfrom>allvaluesfromclass_id_seq</allvaluesfrom>
+		<cardinality>cardinalityclass_id_seq</cardinality>
+		<complementclass>complementclass_id_seq</complementclass>
+		<datatype>datatype_id_seq</datatype>
+		<datatype_restriction>datatype_restriction_seq</datatype_restriction>
+		<hasself>hasself_id_seq</hasself>
+		<hasvalue>hasvalue_id_seq</hasvalue>
+		<individual>individual_id_seq</individual>
+		<intersectionclass>intersection_seq</intersectionclass>
+		<kb>kb_id_seq</kb>
+		<literal>literal_id_seq</literal>
+		<mincardinality>mincardinalityclass_id_seq</mincardinality>
+		<maxcardinality>maxcardinalityclass_id_seq</maxcardinality>
+		<namespace>namespace_id_seq</namespace>
+		<oneof>oneof_seq</oneof>
+		<ontology_uri>ontologyuri_id_seq</ontology_uri>
+		<primitive_class>primitiveclass_id_seq</primitive_class>
+		<property>property_id_seq</property>
+		<somevaluesfrom>somevaluesfromclass_id_seq</somevaluesfrom>
+		<unionclass>union_seq</unionclass>
+	</sequence>
+</db_config>
