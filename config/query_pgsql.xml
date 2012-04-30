@@ -153,6 +153,9 @@
   		          or "" (no restriction). If empty string "" is used, all kb will 
   		          be searched.
     -->
+	<meta>
+		<delete_kb>delete from kb where name = :1</delete_kb>
+	</meta>
 </db_config>
 <!-- old SearchAllIDByName 		    select id, :3 from primitiveclass where name = ':1' and is_system = false :2 union
   		    select id, :4 from property where name = ':1' and is_system = false :2 union
