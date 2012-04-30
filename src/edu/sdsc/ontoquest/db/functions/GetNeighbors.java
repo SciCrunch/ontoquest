@@ -10,7 +10,7 @@ import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: GetNeighbors.java,v 1.1 2010-10-28 06:30:11 xqian Exp $
+ * @version $Id: GetNeighbors.java,v 1.2 2012-04-30 22:42:45 xqian Exp $
  *
  */
 public class GetNeighbors implements OntoquestFunction<ResourceSet> {
@@ -211,7 +211,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     args[8] = String.valueOf(isSynonymIncluded);
     args[9] = composePropertyType();
 
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")");
 
   }
@@ -238,7 +238,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     args[8] = String.valueOf(isSynonymIncluded);
     args[9] = composePropertyType();
 
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")");
 
   }
@@ -270,7 +270,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     args[7] = String.valueOf(isClassOnly);
     args[8] = composePropertyType();
 
-    return DbUtility.executeSQLCommandName(queryName, context, varList, args, 
+    return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")");
   }
 
