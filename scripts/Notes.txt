@@ -1,0 +1,8 @@
+If the autovacuum is a problem during graph loading, skip it by (sys permission required):
+
+insert into pg_autovacuum (select oid, false,-1,-1,-1,-1,-1,-1,-1,-1 from pg_class where relname in ('graph_nodes_all', 'graph_edges_all') 
+);
+
+Later, remove it.
+
+delete from pg_autovacuum where vacrelid in (select oid from pg_class where relname in ('graph_nodes_all', 'graph_edges_all'));

@@ -1,4 +1,4 @@
-/* 
+﻿/* 
 Changes from IODT schema:
 1. Add kbid into each table. There is no need to create a whole set of tables for each ontology. 
    It makes easier to create inter-ontology relationships. 
@@ -82,6 +82,8 @@ select drop_if_exists('subpropertyof');
 select drop_if_exists('disjointclass');
  
 select drop_if_exists('inversepropertyof');
+
+select drop_if_exists('datatype_restriction');
 
 select drop_if_exists('maxcardinalityclass');
  
@@ -559,7 +561,7 @@ CREATE TABLE intersectionclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
   browsertext text,
-  , type char(1) check (type in ('d', 'o'))  -- d: data o: object
+  type char(1) check (type in ('d', 'o')),  -- d: data o: object
   constraint uk_intersection UNIQUE (id, classid, rtid)
 );
 
@@ -577,7 +579,7 @@ CREATE TABLE unionclass (
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
   browsertext text,
-  , type char(1) check (type in ('d', 'o'))  -- d: data o: object
+  type char(1) check (type in ('d', 'o')),  -- d: data o: object
   constraint uk_union UNIQUE (id, classid, rtid)
 );
 
@@ -595,7 +597,7 @@ CREATE TABLE hasself (
   , browsertext text
 );
 
-CREATE INDEX hasself_idx1 ON hasvalue (propertyid);
+CREATE INDEX hasself_idx1 ON hasself (propertyid);
 
 -- owl:hasValue
 CREATE TABLE hasvalue (
@@ -663,8 +665,7 @@ CREATE TABLE domain (
   domainid integer NOT NULL,
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE
-  , type char(1),
-  contraint domain_type_chk CHECK (type in ('a', 'd', 'o'))
+  , type char(1) CHECK (type in ('a', 'd', 'o'))
 );
 
 CREATE INDEX domain_idx1 ON domain (propertyid);
@@ -696,8 +697,7 @@ CREATE TABLE range (
   rangeid integer NOT NULL,
   rtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
-  , type char(1),
-  contraint range_type_chk CHECK (type in ('a', 'd', 'o'))
+  , type char(1) CHECK (type in ('a', 'd', 'o'))
 );
 
 CREATE INDEX range_idx1 ON range (propertyid);

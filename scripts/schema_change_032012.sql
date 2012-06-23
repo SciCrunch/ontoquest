@@ -52,7 +52,7 @@ alter table disjointclass add column type char(1) check (type in ('c', 'd', 'o')
 
 alter table unionclass add column type char(1) check (type in ('d', 'o'));
 
-alter table oneofclass add column type char(1) check (type in ('d', 'o'));
+alter table oneof add column type char(1) check (type in ('d', 'o'));
 
 alter table complementofclass add column type char(1) check (type in ('d', 'o'));
 

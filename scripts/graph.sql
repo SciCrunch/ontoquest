@@ -13,7 +13,7 @@ drop table if exists graph_nodes_all cascade;
  * anonymous is hidden from user. 
  * @col is_obsolete -- if true, the node is deprecated.
  */
- /*
+/*
 create table graph_nodes_all (
   rid integer NOT NULL,
   rtid integer NOT NULL,
@@ -55,7 +55,7 @@ create view graph_nodes as select * from graph_nodes_all where is_obsolete = fal
  * @col restriction_stmt -- the restriction statement (text to be shown along with the edge label).
  * @col is_obsolete -- if true, the edge is deprecated.
  */
- /*
+/*
 create table graph_edges_all (
   rid1 integer NOT NULL,
   rtid1 integer NOT NULL,
@@ -420,6 +420,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 		where e.rid2 = i.id and e.rtid2 = rt.id and rt.rtype = 'x' and e.kbid = theKbid
 		and not exists(select * from graph_edges_all e2 where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 and e.pid =e2.pid
 		and i.classid = e2.rid2 and i.rtid = e2.rtid2);
+   raise notice 'Iteration %, inserted inferred intersection classes', j;
 		
 		-- insert inferred edge from allValuesFrom class.
 		-- e.g. Wine -- subclassOf/equivalent/intersectionOf -> (something --:forall:hasMaker-> Winery) will generate:
@@ -431,6 +432,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
         and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
         and not exists(select * from graph_edges_all e2 where s.rid1=e2.rid1 and s.rtid1=e2.rtid1 and t.propertyid=e2.pid
         and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2) and s.kbid = theKbid;
+  raise notice 'Iteration %, inserted inferred allValuesFrom classes', j;
 		  
 		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
       from somevaluesfromclass t, graph_edges s, resourcetype rt, property p
@@ -439,9 +441,18 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
       and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
       and not exists(select * from graph_edges_all e2 where s.rid1=e2.rid1 and s.rtid1=e2.rtid1 and t.propertyid=e2.pid
           and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2) and s.kbid = theKbid;		
+  raise notice 'Iteration %, inserted inferred someValuesFrom classes', j;
 		
 	END LOOP;
  
+	END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_inference_edges2(theKbid integer)
+  RETURNS VOID AS $$
+
+  DECLARE
+  BEGIN
 	-- for equivalent classes (A equivalentClass B) and all edges involved A (A rel X), add edges B rel X in edge table. Similar for X rel A. Vice versa.
 	INSERT INTO graph_edges_all select e1.rid2 as rid1, e1.rtid2 as rtid1, e2.pid, e2.rid2, e2.rtid2, e2.kbid, 
 	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
@@ -449,6 +460,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false
 	and not exists(select * from graph_edges_all e3 where e1.rid2=e3.rid1 and e1.rtid2=e3.rtid1 and e2.pid=e3.pid) 
 	and e2.kbid = theKbid;
+  raise notice 'Inserted inferred equivalent relationships type 1';
 
 	INSERT INTO graph_edges_all select e1.rid1 as rid1, e1.rtid1 as rtid1, e2.pid, e2.rid2, e2.rtid2, e2.kbid, 
 	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
@@ -456,6 +468,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false
 	and not exists(select * from graph_edges_all e3 where e1.rid1=e3.rid1 and e1.rtid1=e3.rtid1 and e2.pid=e3.pid)
 	and e2.kbid = theKbid;
+  raise notice 'Inserted inferred equivalent relationships type 2';
 
 	INSERT INTO graph_edges_all select e2.rid1 as rid1, e2.rtid1 as rtid1, e2.pid, e1.rid2, e1.rtid2, e2.kbid, 
 	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
@@ -463,6 +476,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false 
 	and not exists(select * from graph_edges_all e3 where e2.rid1=e3.rid1 and e2.rtid1=e3.rtid1 and e2.pid=e3.pid)
 	and e2.kbid = theKbid;
+  raise notice 'Inserted inferred equivalent relationships type 3';
 
 	INSERT INTO graph_edges_all select e2.rid1 as rid1, e2.rtid1 as rtid1, e2.pid, e1.rid1, e1.rtid1, e2.kbid, 
 	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
@@ -470,13 +484,38 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false 
 	and not exists(select * from graph_edges_all e3 where e2.rid1=e3.rid1 and e2.rtid1=e3.rtid1 and e2.pid=e3.pid)
 	and e2.kbid = theKbid;
-	
+  raise notice 'Inserted inferred equivalent relationships type 4';
+
 	-- an extra check to remove those subClassOf edges which are not properly defined. 
 	-- e.g. if someone improperly declared A subClassOf B, A equivalentClass B, we will have cycles after adding
 	-- inference edges. In this case, we shall remove inference edges.
 	DELETE FROM graph_edges_all e1 where pid in (select id from property where name = 'subClassOf' and kbid=theKbid) 
 	and exists (select * from graph_edges e2 where e1.pid = e2.pid and
 	e1.rid1 = e2.rid2 and e1.rtid1 = e2.rtid2 and e1.rid2 = e2.rid1 and e1.rtid2 = e2.rtid2) and derived = true;
+  raise notice 'Delete improper subClassOf relationships';
+
+	-- for equivalent properties (A equivalentProperty B) and all edges involved A (X A Y), add edges X B Y in edge table. Similar for Y A X.
+	INSERT INTO graph_edges_all select e1.rid2 as rid1, e1.rtid2 as rtid1, e2.pid, e2.rid2, e2.rtid2, e2.kbid, 
+	true, e2.hidden, e2.restriction_type, e2.restriction_stmt, e2.is_obsolete 
+	from graph_edges_all e1, property p, property p2, graph_edges_all e2 where e1.rid1 = e2.rid1 and e1.rtid1 = e2.rtid1 
+	and e1.pid = p.id and p.name = 'equivalentClass' and e2.pid != p.id and e2.pid = p2.id and p2.is_annotation = false
+	and not exists(select * from graph_edges_all e3 where e1.rid2=e3.rid1 and e1.rtid2=e3.rtid1 and e2.pid=e3.pid) 
+	and e2.kbid = theKbid;
+  raise notice 'Inserted inferred equivalent properties type 1';
+
+	-- Handle inverseOf properties, e.g. p1 inverseOf p2. For all edges involving p1, e.g. X p1 Y, add Y p2 X into the graph
+	INSERT INTO graph_edges_all select e.rid2, e.rtid2, i.propertyid2, e.rid1, e.rtid1, e.kbid, true, e.hidden, e.restriction_type, 
+	e.restriction_stmt, e.is_obsolete from graph_edges_all e, inversepropertyof i where 
+	e.pid = i.propertyid1 and i.propertyid1 != i.propertyid2 and not exists (select * from graph_edges e2 where e.rid2 = e2.rid1 
+	and e.rtid2 = e2.rtid1 and i.propertyid2 = e2.pid and e.rid1 = e2.rid2 and e.rtid1 = e2.rtid2) and i.kbid = theKbid;
+  raise notice 'Inserted inferred inverseOf relationship type 1';
+
+	INSERT INTO graph_edges_all select e.rid2, e.rtid2, i.propertyid1, e.rid1, e.rtid1, e.kbid, true, e.hidden, e.restriction_type, 
+	e.restriction_stmt, e.is_obsolete from graph_edges_all e, inversepropertyof i where 
+	e.pid = i.propertyid2 and i.propertyid1 != i.propertyid2 and not exists (select * from graph_edges e2 where e.rid2 = e2.rid1 
+	and e.rtid2 = e2.rtid1 and i.propertyid1 = e2.pid and e.rid1 = e2.rid2 and e.rtid1 = e2.rtid2) and i.kbid = theKbid;
+  raise notice 'Inserted inferred inverseOf relationship type 2';
+
   END;
 $$ LANGUAGE plpgsql;
 
@@ -1127,7 +1166,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       g2.rtid1 = g.rtid2 and g2.pid = ip.propertyid2 and g2.rid2 = g.rid1 and g2.rtid2 = g.rtid1 and g2.kbid = g.kbid);
     raise notice 'added inferred inversedOf relationships as edges';
 
-    perform update_inference_edges(theKbid);
+--    perform update_inference_edges(theKbid);
 	
     -- update status of some hidden edges. If a restriction appears as object of another non-hidden edge, set the corresponding restriction edge to non-hidden.
     UPDATE graph_edges_all g1 set hidden = false where hidden = true and g1.rtid1 in 
