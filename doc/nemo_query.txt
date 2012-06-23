@@ -1,0 +1,330 @@
+******* PATTERN CLASS *********
+visual_occipital_P100_pattern EquivalentTo scalp_recorded_ERP_extracted_pattern 
+
+	(1) and (has_proper_part some (peak_latency_measurement_datum 		
+		that (has_numeric_value some (decimal[>= "70"^^decimal] 
+		   and decimal[<= "140"^^decimal]))))
+
+	(2) that ((has_proper_part some (intensity_measurement_datum 	
+		that (is_quality_measurement_of some (intensity 
+			that (inheres_in some (scalp_recorded_ERP 
+				that (unfolds_in some occipital_scalp_surface_region))))) 
+		and (has_numeric_value some decimal[>= ".4"^^decimal]))) 
+
+	(3) and (proper_part_of some (averaged_EEG_data_set 			
+		that (is_about some (scalp_recorded_ERP 
+			that (occurs_in_response_to some (onset_stimulus_presentation 
+				that (has_object some (object 
+					that (has_quality some visual) 
+					and (has_role some stimulus_role)))))))))) 
+
+******** Data ********
+1.	001 type scalp_recorded_ERP_extracted_pattern
+2.	001 has_proper_part 002
+3.	001 has_proper_part 003
+4.	002 type peak_latency_measurement_datum
+5.	002 has_numeric_value "X.XX"^^decimal --> computed from Metric Extraction
+6.	(002 has_measurement_unit millisecond)
+7.	003 type [mean_intensity_measurement_datum]*
+8.	003 has_numeric_value "X.XX"^^decimal --> computed from Metric Extraction
+9.	003 is_about 004, etc. (*)
+10.	(003 has_measurement_unit microvolt)
+11.	004 type intensity
+12.	004 inheres_in 102
+13.	101 type averaged_EEG_dataset
+14.	101 has_proper_part 001
+15.	101 is_about 102
+16.	102 type scalp_recorded_ERP
+17.	102 unfolds_in 105, etc. (*)
+18.	103 type object (or some subclass that can play the role of stimulus)
+19.	103 has_role 106
+20.	104 type visual (or some subclass of qulity that can play the role of stimulus quality)
+21.	103 has_quality 104
+22.	105 type (subclass of regional_part_scalp_surface_region_of_interest)
+23.	106 type stimulus_role
+
+******** Ontoquest Query *********
+?a instanceof ?001,  #line1,
+?001 isa scalp_recorded_ERP_extracted_pattern, #line1, note1
+?001 has_proper_part ?002, #line2
+?001 has_proper_part ?003, #line3
+?002 isa peak_latency_measurement_datum, #line4
+FILTER(in_range(?002, has_numeric_value, "X.XX")), #line5, note2
+?002 has_measurement_unit millisecond, #line6
+?003 isa mean_intensity_measurement_datum, #line7
+FILTER(in_range(?003, has_numeric_value, "X.XX")), #line8
+?003 is_about ?004, #line9, note3
+?004 has_measurement_unit microvolt, #line10
+?004 isa intensity, #line11
+?004 inheres_in ?102, #line12
+?101 isa averaged_EEG_dataset, #line13
+?101 has_proper_part ?001, #line14
+?101 is_about ?102, #line15, note3
+?102 isa scalp_recorded_ERP, #line16
+?102 unfolds_in ?105, #line17
+?103 isa object, #line18,
+?103 has_role ?106, #line19
+?104 isa visual, #line20
+?103 has_quality ?104, #line21
+?105 isa regional_part_scalp_surface_region_of_interest, #line22
+?106 isa stimulus_role.
+
+Return ?001
+
+******* notes **********
+note1: "isa" means finding classes equal to or subclassOf.
+note2: in_range will be a post-processing function.
+note3: is_about should be translated to someValuesFrom(subClassOf(?004)) ? Not sure about this.
+note4: The RDF data may include predicates that should not be used to find visual_occipital_P100_pattern. These predicates indicate that the instance may belong to other pattern classes as well. The problem is, we do not know when we should include a predicate in the query to match visual_occipital_P100_pattern. If we include all predicates in the query, we will get nothing.
+note5: A potential problem is that the pattern could go very deep and complex. The query engine may not find a proper query plan.
+=========================
+scalp_recorded_ERP_extracted_pattern: NEMO_0000093
+intesity: PATO_0000049
+"peak_latency_measurement_datum": NEMO_0745000
+"has_numeric_value": NEMO_7943000
+"intensity_measurement_datum": NEMO_6902000
+is_quality_measurement_of: "IAO_0000221"
+
+"averaged_EEG_data_set" NEMO_0000495
+=========================
+?a instanceof ?001,  #line1,
+?001 equivalentClass scalp_recorded_ERP_extracted_pattern, #line1, note1
+?001 equivalentClass ?002a,
+?002a has_proper_part ?002, #line2
+?002c typeOf ?002, #line4
+?002c has_numeric_value ?005, #line5
+?006 owl:onDatatype xsd:decimal,
+?006 xsd:minInclusive 70,
+?007 owl:onDatatype xsd:decimal,
+?007 xsd:maxInclusive 140,
+FILTER(in_range(?005, ?006)), #line5, note2
+FILTER(in_range(?005, ?007)), #line5, note2
+
+?001 has_proper_part ?003, #line3
+?003 isa mean_intensity_measurement_datum, #line7
+?003 has_numeric_value ?008, #line8
+?009 owl:onDatatype xsd:decimal,
+?009 xsd:minInclusive 0.4,
+FILTER(in_range(?008, ?009)), #line8, note2
+
+#?003 is_quality_measurement_of ?004, #line9
+#?004 isa intensity, #line11
+#?004 inheres_in ?102, #line12
+
+
+========================
+?001 -- NEMO_3536000
+?002 -- NEMO_5436000
+?003 -- 15222:"NEMO_6150000" 15225:"NEMO_5520000" 15226:"NEMO_6815000" 15229:"NEMO_5885000" 
+
+========================
+    <owl:Class rdf:about="&ontology;NEMO.owl#NEMO_0000094">
+        <rdfs:label rdf:datatype="&xsd;string">visual_occipital_P100</rdfs:label>
+        <owl:equivalentClass>
+            <owl:Class>
+                <owl:intersectionOf rdf:parseType="Collection">
+                    <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_0000093"/>
+                    <owl:Class>
+                        <owl:intersectionOf rdf:parseType="Collection">
+                            <owl:Restriction>
+                                <owl:onProperty rdf:resource="&ro;has_proper_part"/>
+                                <owl:someValuesFrom>
+                                    <owl:Class>
+                                        <owl:intersectionOf rdf:parseType="Collection">
+                                            <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_6902000"/>
+                                            <owl:Restriction>
+                                                <owl:onProperty rdf:resource="&obo;IAO_0000221"/>
+                                                <owl:someValuesFrom>
+                                                    <owl:Class>
+                                                        <owl:intersectionOf rdf:parseType="Collection">
+                                                            <rdf:Description rdf:about="&PATO;PATO_0000049"/>
+                                                            <owl:Restriction>
+                                                                <owl:onProperty rdf:resource="&OBO_REL;inheres_in"/>
+                                                                <owl:someValuesFrom>
+                                                                    <owl:Class>
+                                                                        <owl:intersectionOf rdf:parseType="Collection">
+                                                                            <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_8225000"/>
+                                                                            <owl:Restriction>
+                                                                                <owl:onProperty rdf:resource="&OBO_REL;unfolds_in"/>
+                                                                                <owl:someValuesFrom rdf:resource="&ontology;NEMO.owl#NEMO_0000007"/>
+                                                                            </owl:Restriction>
+                                                                        </owl:intersectionOf>
+                                                                    </owl:Class>
+                                                                </owl:someValuesFrom>
+                                                            </owl:Restriction>
+                                                        </owl:intersectionOf>
+                                                    </owl:Class>
+                                                </owl:someValuesFrom>
+                                            </owl:Restriction>
+                                            <owl:Restriction>
+                                                <owl:onProperty rdf:resource="&ontology;NEMO.owl#NEMO_7943000"/>
+                                                <owl:someValuesFrom>
+                                                    <rdfs:Datatype>
+                                                        <owl:onDatatype rdf:resource="&xsd;decimal"/>
+                                                        <owl:withRestrictions rdf:parseType="Collection">
+                                                            <rdf:Description>
+                                                                <xsd:minInclusive rdf:datatype="&xsd;decimal">.4</xsd:minInclusive>
+                                                            </rdf:Description>
+                                                        </owl:withRestrictions>
+                                                    </rdfs:Datatype>
+                                                </owl:someValuesFrom>
+                                            </owl:Restriction>
+                                        </owl:intersectionOf>
+                                    </owl:Class>
+                                </owl:someValuesFrom>
+                            </owl:Restriction>
+                            <owl:Restriction>
+                                <owl:onProperty rdf:resource="&ro;proper_part_of"/>
+                                <owl:someValuesFrom>
+                                    <owl:Class>
+                                        <owl:intersectionOf rdf:parseType="Collection">
+                                            <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_0000495"/>
+                                            <owl:Restriction>
+                                                <owl:onProperty rdf:resource="&obo;IAO_0000136"/>
+                                                <owl:someValuesFrom>
+                                                    <owl:Class>
+                                                        <owl:intersectionOf rdf:parseType="Collection">
+                                                            <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_8225000"/>
+                                                            <owl:Restriction>
+                                                                <owl:onProperty rdf:resource="&ontology;NEMO.owl#NEMO_0367000"/>
+                                                                <owl:someValuesFrom>
+                                                                    <owl:Class>
+                                                                        <owl:intersectionOf rdf:parseType="Collection">
+                                                                            <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_4762000"/>
+                                                                            <owl:Restriction>
+                                                                                <owl:onProperty rdf:resource="&ontology;NEMO.owl#NEMO_1568000"/>
+                                                                                <owl:someValuesFrom>
+                                                                                    <owl:Class>
+                                                                                        <owl:intersectionOf rdf:parseType="Collection">
+                                                                                            <rdf:Description rdf:about="&snap;Object"/>
+                                                                                            <owl:Restriction>
+                                                                                                <owl:onProperty rdf:resource="&obo;OBI_0000298"/>
+                                                                                                <owl:someValuesFrom rdf:resource="&ontology;NEMO.owl#NEMO_0000453"/>
+                                                                                            </owl:Restriction>
+                                                                                            <owl:Restriction>
+                                                                                                <owl:onProperty rdf:resource="&obo;OBI_0000316"/>
+                                                                                                <owl:someValuesFrom rdf:resource="&ontology;NEMO.owl#NEMO_0000468"/>
+                                                                                            </owl:Restriction>
+                                                                                        </owl:intersectionOf>
+                                                                                    </owl:Class>
+                                                                                </owl:someValuesFrom>
+                                                                            </owl:Restriction>
+                                                                        </owl:intersectionOf>
+                                                                    </owl:Class>
+                                                                </owl:someValuesFrom>
+                                                            </owl:Restriction>
+                                                        </owl:intersectionOf>
+                                                    </owl:Class>
+                                                </owl:someValuesFrom>
+                                            </owl:Restriction>
+                                        </owl:intersectionOf>
+                                    </owl:Class>
+                                </owl:someValuesFrom>
+                            </owl:Restriction>
+                        </owl:intersectionOf>
+                    </owl:Class>
+                    <owl:Restriction>
+                        <owl:onProperty rdf:resource="&ro;has_proper_part"/>
+                        <owl:someValuesFrom>
+                            <owl:Class>
+                                <owl:intersectionOf rdf:parseType="Collection">
+                                    <rdf:Description rdf:about="&ontology;NEMO.owl#NEMO_0745000"/>
+                                    <owl:Restriction>
+                                        <owl:onProperty rdf:resource="&ontology;NEMO.owl#NEMO_7943000"/>
+                                        <owl:someValuesFrom>
+                                            <rdfs:Datatype>
+                                                <owl:intersectionOf rdf:parseType="Collection">
+                                                    <rdfs:Datatype>
+                                                        <owl:onDatatype rdf:resource="&xsd;decimal"/>
+                                                        <owl:withRestrictions rdf:parseType="Collection">
+                                                            <rdf:Description>
+                                                                <xsd:minInclusive rdf:datatype="&xsd;decimal">70</xsd:minInclusive>
+                                                            </rdf:Description>
+                                                        </owl:withRestrictions>
+                                                    </rdfs:Datatype>
+                                                    <rdfs:Datatype>
+                                                        <owl:onDatatype rdf:resource="&xsd;decimal"/>
+                                                        <owl:withRestrictions rdf:parseType="Collection">
+                                                            <rdf:Description>
+                                                                <xsd:maxInclusive rdf:datatype="&xsd;decimal">140</xsd:maxInclusive>
+                                                            </rdf:Description>
+                                                        </owl:withRestrictions>
+                                                    </rdfs:Datatype>
+                                                </owl:intersectionOf>
+                                            </rdfs:Datatype>
+                                        </owl:someValuesFrom>
+                                    </owl:Restriction>
+                                </owl:intersectionOf>
+                            </owl:Class>
+                        </owl:someValuesFrom>
+                    </owl:Restriction>
+                </owl:intersectionOf>
+            </owl:Class>
+        </owl:equivalentClass>
+        <NEMO_annot:created_date rdf:datatype="&xsd;string">2009-06-07</NEMO_annot:created_date>
+        <NEMO_annot:modified_date rdf:datatype="&xsd;string">2011-06-08</NEMO_annot:modified_date>
+        <NEMO_annot:definition_source rdf:datatype="&xsd;string">Luck, S. J., Heinze, H. J., Mangun, G. R., &amp; Hillyard, S. A. (1990). Visual event-related potentials index focused attention within bilateral stimulus arrays.  II  Functional dissociation of P1 and N1 components. Electroencephalography &amp; clinical Neurophysiology, 75, 528-542.</NEMO_annot:definition_source>
+        <NEMO_annot:namespace rdf:datatype="&xsd;string">NEMO_erp</NEMO_annot:namespace>
+        <NEMO_annot:synonym rdf:datatype="&xsd;string">P1</NEMO_annot:synonym>
+        <NEMO_annot:synonym rdf:datatype="&xsd;string">P100</NEMO_annot:synonym>
+        <NEMO_annot:onto_definition rdf:datatype="&xsd;string">The visual_occipital_P100 is_a scalp-recorded_ERP_extracted_pattern 
+      
+and has_proper_part SOME peak_latency_measurement_datum
+       that has_numeric_value SOME decimal[&gt;=&quot;70&quot;, &lt;=&quot;140&quot;]
+
+and has_proper_part SOME intensity_measurement_datum
+       that has_numeric_value SOME decimal[&gt;=&quot;0.4&quot;]
+       that is_quality_measurement_of SOME intensity
+            that inheres_in SOME scalp_recorded_ERP
+                that unfolds_in SOME occipital_scalp_surface_region
+                that occurs_in_response_to SOME onset_stimulus_presentation
+                        that has_object SOME object
+                                    that has_role SOME object
+                                    and has_quality SOME visual
+
+
+$and proper_part_of SOME averaged_EEG_data_set
+$       that has_provenance_specification SOME event_type_label
+$            that has_character_string_value SOME &quot;stimulus_onset&quot;
+$       and has_provenance_specification SOME stimulus_type_label
+$            that has_character_string_value SOME &quot;object&quot;
+$       and has_provenance_specification SOME stimulus_modality_label
+$            that has_character_string_value SOME &quot;visual&quot;
+
+IF
+$ 001 is proper_part_of SOME averaged EEG_data_set (002)
+$       that has_provenance_specification SOME event_type_label
+$            that has_character_string_value SOME &quot;stimulus_onset&quot;
+AND
+$002 is_about SOME scalp_recorded_ERP (003)
+THEN
+$003 occurs_in_response_to SOME onset_stimulus_presentation
+
+IF
+$ 001 is proper_part_of SOME averaged EEG_data_set (002)
+$       that has_provenance_specification SOME stimulus_type_label
+$            that has_character_string_value SOME &quot;word&quot;
+AND
+$002 is_about SOME scalp_recorded_ERP (003)
+THEN
+$003 occurs_in_response_to SOME onset_stimulus_presentation
+                        that has_object SOME object
+                                    that has_role SOME stimulus_role
+
+
+IF
+$ 001 is proper_part_of SOME averaged EEG_data_set (002)
+$       that has_provenance_specification SOME stimulus_modality_label
+$            that has_character_string_value SOME &quot;visual&quot;
+AND
+$002 is_about SOME scalp_recorded_ERP (003)
+THEN
+$003 occurs_in_response_to SOME onset_stimulus_presentation
+                        that has_object SOME object
+                                    that has_quality SOME visual</NEMO_annot:onto_definition>
+        <NEMO_annot:pref_label rdf:datatype="&xsd;string">visual_occipital_P100</NEMO_annot:pref_label>
+        <NEMO_annot:definition rdf:datatype="&xsd;string">visual_occipital_P100 is a positivity that is maximal over occipital scalp regions at about 70-140 ms after onset of a visual stimulus.</NEMO_annot:definition>
+        <NEMO_annot:curator rdf:resource="&ontology;NEMO_annotation_properties.owl#Gwen_Frishkoff"/>
+        <NEMO_annot:curation_status rdf:resource="&ontology;NEMO_annotation_properties.owl#pending_final_vetting"/>
+        <NEMO_annot:evidence_code rdf:resource="&ontology;NEMO_annotation_properties.owl#traceable_author_statement"/>
+    </owl:Class>

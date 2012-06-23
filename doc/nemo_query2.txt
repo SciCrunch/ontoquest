@@ -1,0 +1,72 @@
+Given an instance, find its class
+
+NEMO_3536000 type ?a,
+?a isa NEMO_0000093, (isa: superClassOf or equivalent or intersectionOf)
+NEMO_7094000 type ?g
+?a proper_part_of ?g,
+
+?a has_proper_part ?b,
+?b isa NEMO_0745000,
+?a has_proper_part ?i,
+?i NEMO_7943000 ?c,
+?g2 proper_part_of NEMO_3536000,
+?g2 type NEMO_0745000,
+?g2 NEMO_7943000 ?v1, #note: v1=120, we can skip this step if we use 120 directly
+FILTER (in_range(?v1, ?c)),
+
+?a has_proper_part ?h,
+?h isa NEMO_4142000,
+?a has_proper_part ?j,
+?j NEMO_7943000 ?d,
+?k proper_part_of NEMO_3536000,
+?k type NEMO_4142000,
+?k NEMO_7943000 ?v2, #note: v2=2.8, we can skip this step if we use 2.8 directly
+FILTER (in_range(?j, ?d)),
+
+?a has_proper_part ?e,
+?e isa NEMO_8297000,
+?a has_proper_part ?m,
+?m NEMO_7943000 ?f,
+?l proper_part_of NEMO_3536000,
+?l type NEMO_8297000,
+?l NEMO_7943000 ?v3, #note: v2=2.5, we can skip this step if we use 2.5 directly
+FILTER (in_range(?v3, ?f)),
+
+
+NEMO_7094000
+
+<owl:NamedIndividual rdf:about="&ontology;NEMO.owl#NEMO_3536000">
+	<rdf:type rdf:resource="&ontology;NEMO.owl#NEMO_0000093"/>
+	<rdfs:label rdf:datatype="&xsd;string">TESTEXPT-TESTCOND1_TESTPATT_P100</rdfs:label>
+	<ro:proper_part_of rdf:resource="&ontology;NEMO.owl#NEMO_7094000"/>
+</owl:NamedIndividual>
+	
+<owl:NamedIndividual rdf:about="&ontology;NEMO.owl#NEMO_5436000">
+	<rdf:type rdf:resource="&ontology;NEMO.owl#NEMO_0745000"/>
+	<rdfs:label rdf:datatype="&xsd;string">TESTEXPT-TESTCOND1_TESTPATT_peak_latency</rdfs:label>
+	<NEMO_7943000 rdf:datatype="&xsd;decimal">120</NEMO_7943000>
+	<ro:proper_part_of rdf:resource="&ontology;NEMO.owl#NEMO_3536000"/>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="&ontology;NEMO.owl#NEMO_6150000">
+	<rdf:type rdf:resource="&ontology;NEMO.owl#NEMO_4142000"/>
+	<rdfs:label rdf:datatype="&xsd;string">TESTEXPT-TESTCOND1_TESTPATT_Intensity_measurement_value</rdfs:label>
+	<NEMO_7943000 rdf:datatype="&xsd;decimal">2.8</NEMO_7943000>
+	<ro:proper_part_of rdf:resource="&ontology;NEMO.owl#NEMO_3536000"/>
+</owl:NamedIndividual>
+
+<owl:NamedIndividual rdf:about="&ontology;NEMO.owl#NEMO_6815000">
+	<rdf:type rdf:resource="&ontology;NEMO.owl#NEMO_8297000"/>
+	<rdfs:label rdf:datatype="&xsd;string">TESTEXPT-TESTCOND1_TESTPATT_Intensity_measurement_value</rdfs:label>
+	<NEMO_7943000 rdf:datatype="&xsd;decimal">2.5</NEMO_7943000>
+	<ro:proper_part_of rdf:resource="&ontology;NEMO.owl#NEMO_3536000"/>
+</owl:NamedIndividual>
+    
+	Suppose ?a is the pattern class for individual NEMO_3536000. Based on the information above, we know that ?a must satisfy the following conditions:
+	?a has_proper_part ?h, (a should have a part, let's name it h)
+	?h isa NEMO_4142000, (h should be subclass of or equivalent to NEMO_4142000) *
+	?a has_proper_part ?j, ( a should have another part, let's call it j)
+	?j NEMO_7943000 ?d, (j has_numeric_value ?d)
+	FILTER (in_range(2.8, ?d)), (2.8 should be in the range of d)
+	
+	

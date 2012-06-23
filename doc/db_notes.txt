@@ -45,7 +45,7 @@ grant all on schema executor to executor;
        listen_addresses = '*'
 5.2) In data/pg_hba.conf, add entries to allow connections from remote machines. For example,
      to allow user 'ont' to connect to database 'test' from any machine, add the following entry:
-       host    test        ont         0.0.0.0/0             password
+       host    test        ont         0.0.0.0/0             md5
  
 6. Define a new procedure language, such as pgplsql, in a database
 6.1) List currently installed language:
@@ -53,3 +53,7 @@ createlang -l ontoquest
 
 6.2) Add a language:
 createlang pgplsql ontoquest
+
+7. Grant proper privilege of the database to the new user.
+grant connect on database ontoquest to ont;
+grant all on database ontoquest to ont;

@@ -1,0 +1,72 @@
+Given an instance, find its class
+
+GAF-LP1_+NN-+NW_ERP_+372 type ?a,
+?a isa NEMO_0877000,
+?a proper_part_of ?x,
+GAF-LP1_+NN-+NW_ERP_data type ?x,
+
+#ERP-Metric-Instance Assertion 116
+#mean intensity filter
+?a has_proper_part ?b,
+?b isa NEMO_9763000,
+?a has_proper_part ?i,
+?i NEMO_7943000 ?c,
+?g proper_part_of GAF-LP1_+NN-+NW_ERP_+372,
+?g type NEMO_9763000,
+?g NEMO_7943000 ?v1, #note: v1=-01.23342842, we can skip this step if we use the value directly
+FILTER (in_range(?v1, ?c)),
+
+?x IAO_0000136 ?i,
+?x NEMO_7943000 ?k,
+?h IAO_0000136 ?g, # ?h is p_value
+?h type NEMO_4918000,
+?h NEMO_7943000 ?vp,
+FILTER (in_range(?vp, ?k),
+
+#peak latency
+?a has_proper_part ?b2,
+?b2 isa NEMO_0745000,
+?a has_proper_part ?i2,
+?i2 NEMO_7943000 ?c2,
+?g2 proper_part_of GAF-LP1_+NN-+NW_ERP_+372,
+?g2 type NEMO_0745000,
+?g2 NEMO_7943000 ?v2, 
+FILTER (in_range(?v2, ?c2)),
+
+=====================================
+GAF-LP1_+NN_ERP_+372 type ?a,
+?a isa NEMO_0000093,
+?a proper_part_of ?g,
+GAF-LP1_+NN_ERP_data type ?g,
+
+#GAF-LP1_+NN_ERP_+372_mean_intensity_LFRONT
+?a has_proper_part ?b,
+?b isa NEMO_2257000,
+?a has_proper_part ?i,
+?i NEMO_7943000 ?c,
+?g2 proper_part_of GAF-LP1_+NN_ERP_+372,
+?g2 type NEMO_2257000,
+?g2 NEMO_7943000 ?v1, #note: v1=-01.23342842, we can skip this step if we use the value directly
+FILTER (in_range(?v1, ?c)),
+
+#GAF-LP1_+NN_ERP_+372_mean_intensity_LOCC
+?a has_proper_part ?d,
+?d isa NEMO_8297000,
+?d NEMO_7943000 ?v2,
+FILTER(in_range(+01.16935525, ?v2)),
+
+#GAF-LP1_+NN_ERP_+372_mean_intensity_LORB
+?a has_proper_part ?e,
+?e isa NEMO_8430000,
+?e NEMO_7943000 ?v3,
+FILTER(in_range(-00.17341847,?v3)),
+
+#GAF-LP1_+NN_ERP_+372_mean_intensity_LPAR
+?a has_proper_part ?f,
+?f isa NEMO_3703000,
+?f NEMO_7943000 ?v4,
+FILTER(in_range(-00.54072247,?v4)),
+
+
+
+
