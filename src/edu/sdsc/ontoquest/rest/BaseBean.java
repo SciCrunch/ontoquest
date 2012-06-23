@@ -11,7 +11,7 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: BaseBean.java,v 1.3 2012-04-30 22:44:13 xqian Exp $
+ * @version $Id: BaseBean.java,v 1.4 2012-06-23 17:19:27 xqian Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
  * 
@@ -103,8 +103,8 @@ public abstract class BaseBean {
 		definitionPropertySet.add("description");
 		definitionPropertySet.add("externallySourcedDefinition");
 		definitionPropertySet.add("birnlexDefinition");
-		definitionPropertySet.add("birnlexComment");
-		definitionPropertySet.add("comment");
+		// definitionPropertySet.add("birnlexComment");
+		// definitionPropertySet.add("comment");
 		definitionPropertySet.add("tempDefinition");
 
 	}

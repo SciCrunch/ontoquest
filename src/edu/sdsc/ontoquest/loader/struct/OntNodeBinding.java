@@ -9,7 +9,7 @@ import edu.sdsc.ontoquest.loader.struct.OntNode.NodeType;
 /**
  * BDB binding for OntNode
  * 
- * @version $Id: OntNodeBinding.java,v 1.1 2012-04-30 22:43:26 xqian Exp $
+ * @version $Id: OntNodeBinding.java,v 1.2 2012-06-23 17:19:27 xqian Exp $
  * @author xqian
  * 
  */
@@ -17,11 +17,19 @@ public class OntNodeBinding extends TupleBinding<OntNode> {
 
 	@Override
 	public OntNode entryToObject(TupleInput ti) {
-		NodeType type = NodeType.getType(ti.readInt());
-		int rid = ti.readInt();
-		String iri = ti.readString();
-		String browserText = ti.readString();
-		return new OntNode(iri, type, rid, browserText);
+		int typeInt = -1;
+		try {
+			typeInt = ti.readInt();
+			NodeType type = NodeType.getType(typeInt);
+			int rid = ti.readInt();
+			String iri = ti.readString();
+			String browserText = ti.readString();
+			return new OntNode(iri, type, rid, browserText);
+		} catch (Exception e) {
+			System.out.println("type int: " + typeInt);
+			e.printStackTrace();
+			return null;
+		}
 	}
 
 	@Override

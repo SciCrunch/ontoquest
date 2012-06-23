@@ -18,10 +18,11 @@ import edu.sdsc.ontoquest.db.functions.GetOntologyURL;
 import edu.sdsc.ontoquest.query.Utility;
 
 /**
- * @version $Id: ClassNode.java,v 1.2 2012-04-30 22:44:14 xqian Exp $
+ * @version $Id: ClassNode.java,v 1.3 2012-06-23 17:19:27 xqian Exp $
  *
  */
 public class ClassNode extends BaseBean {
+
 	public static String generateId(int rid, int rtid) {
 		return rid+"-"+rtid;
 	}

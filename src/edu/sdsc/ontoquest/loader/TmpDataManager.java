@@ -95,13 +95,13 @@ public class TmpDataManager {
 		bulkLoadStmt.put(TmpFileType.DisjointClass, "disjointclass");
 		bulkLoadStmt.put(TmpFileType.Domain, "domain");
 		bulkLoadStmt.put(TmpFileType.EquivalentClass, "equivalentclass");
-		// bulkLoadStmt.put(TmpFileType.EquivalentProperty, "equivalentproperty");
+		bulkLoadStmt.put(TmpFileType.EquivalentProperty, "equivalentproperty");
 		bulkLoadStmt.put(TmpFileType.HasSelf, "hasself");
 		bulkLoadStmt.put(TmpFileType.HasValue, "hasvalue");
 		bulkLoadStmt.put(TmpFileType.Individual,
 				"individual(id,name,nsid,kbid,browsertext,is_named)");
 		bulkLoadStmt.put(TmpFileType.IntersectionClass, "intersectionclass");
-		// bulkLoadStmt.put(TmpFileType.InversePropertyOf, "");
+		bulkLoadStmt.put(TmpFileType.InversePropertyOf, "inversepropertyof");
 		bulkLoadStmt.put(TmpFileType.Literal, "literal");
 		bulkLoadStmt.put(TmpFileType.MaxCardinalityClass, "maxcardinalityclass");
 		bulkLoadStmt.put(TmpFileType.MinCardinalityClass, "mincardinalityclass");

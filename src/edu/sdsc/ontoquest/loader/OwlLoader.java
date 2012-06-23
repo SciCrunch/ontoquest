@@ -50,6 +50,7 @@ import org.semanticweb.owlapi.model.OWLDataOneOf;
 import org.semanticweb.owlapi.model.OWLDataProperty;
 import org.semanticweb.owlapi.model.OWLDataPropertyAssertionAxiom;
 import org.semanticweb.owlapi.model.OWLDataPropertyDomainAxiom;
+import org.semanticweb.owlapi.model.OWLDataPropertyExpression;
 import org.semanticweb.owlapi.model.OWLDataPropertyRangeAxiom;
 import org.semanticweb.owlapi.model.OWLDataRange;
 import org.semanticweb.owlapi.model.OWLDataSomeValuesFrom;
@@ -67,6 +68,7 @@ import org.semanticweb.owlapi.model.OWLEquivalentObjectPropertiesAxiom;
 import org.semanticweb.owlapi.model.OWLFacetRestriction;
 import org.semanticweb.owlapi.model.OWLHasValueRestriction;
 import org.semanticweb.owlapi.model.OWLIndividual;
+import org.semanticweb.owlapi.model.OWLInverseObjectPropertiesAxiom;
 import org.semanticweb.owlapi.model.OWLLiteral;
 import org.semanticweb.owlapi.model.OWLNamedIndividual;
 import org.semanticweb.owlapi.model.OWLNaryBooleanClassExpression;
@@ -83,6 +85,7 @@ import org.semanticweb.owlapi.model.OWLObjectOneOf;
 import org.semanticweb.owlapi.model.OWLObjectProperty;
 import org.semanticweb.owlapi.model.OWLObjectPropertyAssertionAxiom;
 import org.semanticweb.owlapi.model.OWLObjectPropertyDomainAxiom;
+import org.semanticweb.owlapi.model.OWLObjectPropertyExpression;
 import org.semanticweb.owlapi.model.OWLObjectPropertyRangeAxiom;
 import org.semanticweb.owlapi.model.OWLObjectSomeValuesFrom;
 import org.semanticweb.owlapi.model.OWLOntology;
@@ -438,16 +441,20 @@ public class OwlLoader {
 			Set<OWLAnonymousIndividual> entities2 = ontology
 					.getReferencedAnonymousIndividuals();
 			for (OWLAnonymousIndividual entity : entities2) {
-				if (BDBUtil.searchData(tmpDB, entity.getID().getID()) > 0)
+				if (BDBUtil.containsNode(tmpDB, entity.toStringID()))
 					continue;
 
 				int entityId = idCounter.increment();
 
 				// save the entry in BDB.
-				BDBUtil.storeData(tmpDB, entity.getID().getID(), entityId);
+				node.set(entity.toStringID(), NodeType.Individual, entityId,
+						entity.toString());
+				BDBUtil.storeNode(tmpDB, node.getName(), node);
+				// BDBUtil.storeData(tmpDB, entity.getID().getID(), entityId);
 				// System.out.println("Individual: " + entity.getIRI());
-				printLine(writer, String.valueOf(entityId), entity.toStringID(), null,
-						String.valueOf(kbid), String.valueOf(entity.isNamed()));
+				printLine(writer, String.valueOf(entityId), node.getName(), null,
+						String.valueOf(kbid), node.getBrowserText(),
+						String.valueOf(entity.isNamed()));
 			}
 
 		}
@@ -779,6 +786,8 @@ public class OwlLoader {
 			processClassAssertionAxioms(ont);
 			processSubClassOfAxioms(ont);
 			processSubPropertyOfAxioms(ont);
+			processInversePropertyOfAxioms(ont);
+			processEquivalentPropertyOfAxioms(ont);
 			processNaryClassAxioms(ont);
 			processPropertyAssertionAxioms(ont);
 			processPropertyDomainAxioms(ont);
@@ -828,6 +837,51 @@ public class OwlLoader {
 			OntNode node = findNode(e, ontologyId);
 			if (node == null)
 				throw new OntoquestException("Unhandled entity: " + e.getIRI());
+		}
+	}
+
+	private void processEquivalentPropertyOfAxioms(OWLOntology ontology) 		throws OntoquestException, UnsupportedEncodingException {
+		String ontologyId = getOntologyId(ontology);
+		Set<OWLEquivalentObjectPropertiesAxiom> axioms = ontology
+				.getAxioms(AxiomType.EQUIVALENT_OBJECT_PROPERTIES);
+		for (OWLEquivalentObjectPropertiesAxiom axiom : axioms) {
+			Set<OWLObjectPropertyExpression> properties = axiom.getProperties();
+			if (properties == null || properties.size() != 2)
+				throw new OntoquestException(
+						"Incorrect number of properties in equivalent object property "
+								+ axiom);
+
+			Iterator<OWLObjectPropertyExpression> it = properties.iterator();
+			OWLObjectPropertyExpression p1 = it.next();
+			OWLObjectPropertyExpression p2 = it.next();
+			saveEquivalentPropertyOfAxiom(p1, p2, ontologyId);
+		}
+
+		Set<OWLEquivalentDataPropertiesAxiom> axioms2 = ontology
+				.getAxioms(AxiomType.EQUIVALENT_DATA_PROPERTIES);
+		for (OWLEquivalentDataPropertiesAxiom axiom : axioms2) {
+			Set<OWLDataPropertyExpression> properties = axiom.getProperties();
+			if (properties == null || properties.size() != 2)
+				throw new OntoquestException(
+						"Incorrect number of properties in equivalent object property "
+								+ axiom);
+
+			Iterator<OWLDataPropertyExpression> it = properties.iterator();
+			OWLDataPropertyExpression p1 = it.next();
+			OWLDataPropertyExpression p2 = it.next();
+			saveEquivalentPropertyOfAxiom(p1, p2, ontologyId);
+		}
+
+	}
+
+	private void processInversePropertyOfAxioms(OWLOntology ontology)
+			throws OntoquestException, UnsupportedEncodingException {
+		String ontologyId = getOntologyId(ontology);
+		Set<OWLInverseObjectPropertiesAxiom> axioms = ontology
+				.getAxioms(AxiomType.INVERSE_OBJECT_PROPERTIES);
+		for (OWLInverseObjectPropertiesAxiom axiom : axioms) {
+			saveInversePropertyOfAxiom(axiom.getFirstProperty(),
+					axiom.getSecondProperty(), ontologyId);
 		}
 	}
 
@@ -1071,13 +1125,17 @@ public class OwlLoader {
 		// and
 		// save ontologies.
 		manager = OWLManager.createOWLOntologyManager();
-		// Now, we create the file from which the ontology will be loaded.
-		// Here the ontology is stored in a file locally in the ontologies
-		// subfolder of the examples folder.
-		File inputOntologyFile = new File(ontologyFilePath);
-		// We use the OWL API to load the ontology.
+		IRI inputOntologyIRI = IRI.create(ontologyFilePath);
 		OWLOntology ontology = manager
-				.loadOntologyFromOntologyDocument(inputOntologyFile);
+				.loadOntologyFromOntologyDocument(inputOntologyIRI);
+		// // Now, we create the file from which the ontology will be loaded.
+		// // Here the ontology is stored in a file locally in the ontologies
+		// // subfolder of the examples folder.
+		// File inputOntologyFile = new File(ontologyFilePath);
+		// // We use the OWL API to load the ontology.
+		//
+		// OWLOntology ontology = manager
+		// .loadOntologyFromOntologyDocument(inputOntologyFile);
 
 		Connection con = conPool.getConnection(1000);
 		con.setAutoCommit(false);
@@ -1132,7 +1190,7 @@ public class OwlLoader {
 		} catch (Exception e) {
 			try {
 				con.rollback();
-				cleanKB(con);
+				// cleanKB(con);
 			} catch (Exception e2) {
 				log.warn("Unable to rollback inserted rows. Please delete manually!");
 			}
@@ -1302,6 +1360,28 @@ public class OwlLoader {
 				domainNode.getType().getRtid(), kbid, type);
 	}
 
+	private void saveEquivalentPropertyOfAxiom(OWLObject property1,
+			OWLObject property2, String ontologyId) throws OntoquestException,
+			UnsupportedEncodingException {
+		OntNode node1 = findNode(property1, ontologyId);
+		if (node1 == null)
+			throw new OntoquestException(
+					"Couldn't find equivalentPropertyOf axiom's property1 in database: "
+							+ property1.toString());
+
+		// find property
+		OntNode node2 = findNode(property2, ontologyId);
+		if (node2 == null)
+			throw new OntoquestException(
+					"Couldn't find equivalentPropertyOf axiom's property2 in database: "
+							+ property2.toString());
+
+		PrintWriter writer = tmpDataManager
+				.getWriter(TmpFileType.EquivalentProperty);
+		// line: propertyid1, propertyid2, inferred, kbid
+		printLine(writer, node1.getRid(), node2.getRid(), false, kbid);
+	}
+
 	private OntNode saveHasSelfRestriction(OWLObjectHasSelf r, String ontologyId)
 			throws UnsupportedEncodingException, OntoquestException {
 
@@ -1374,6 +1454,28 @@ public class OwlLoader {
 				valNode.getRid(), valNode.getType().getRtid(), kbid, browserText, type);
 
 		return node;
+	}
+
+	private void saveInversePropertyOfAxiom(OWLObject property1, OWLObject property2,
+			String ontologyId) throws OntoquestException,
+			UnsupportedEncodingException {
+		OntNode node1 = findNode(property1, ontologyId);
+		if (node1 == null)
+			throw new OntoquestException(
+					"Couldn't find inversePropertyOf axiom's property1 in database: "
+							+ property1.toString());
+
+		// find property
+		OntNode node2 = findNode(property2, ontologyId);
+		if (node2 == null)
+			throw new OntoquestException(
+					"Couldn't find inversePropertyOf axiom's property2 in database: "
+							+ property2.toString());
+
+		PrintWriter writer = tmpDataManager
+				.getWriter(TmpFileType.InversePropertyOf);
+		// line: propertyid1, propertyid2, inferred, kbid
+		printLine(writer, node1.getRid(), node2.getRid(), false, kbid);
 	}
 
 	public OntNode saveLiteral(OWLLiteral literal) throws OntoquestException,
@@ -1637,6 +1739,7 @@ public class OwlLoader {
 		return node;
 	}
 
+
 	private void savePropertyAssertionAxiom(OWLIndividual subject,
 			OWLPropertyExpression property, OWLPropertyAssertionObject object,
 			String ontologyId) throws UnsupportedEncodingException,
@@ -1678,7 +1781,6 @@ public class OwlLoader {
 					"Unsupported anonymous property expression: " + p);
 		}
 	}
-
 
 	private OntNode saveQuantifiedRestriction(OWLQuantifiedRestriction r,
 			String ontologyId) throws UnsupportedEncodingException,
@@ -1774,9 +1876,9 @@ public class OwlLoader {
 				kbid);
 	}
 
-	private void saveSubPropertyOfAxiom(OWLObject subProperty, OWLObject superProperty,
-			String ontologyId, char type) throws OntoquestException,
-			UnsupportedEncodingException {
+	private void saveSubPropertyOfAxiom(OWLObject subProperty,
+			OWLObject superProperty, String ontologyId, char type)
+					throws OntoquestException, UnsupportedEncodingException {
 		OntNode subNode = findNode(subProperty, ontologyId);
 		if (subNode == null)
 			throw new OntoquestException(
@@ -2082,7 +2184,8 @@ public class OwlLoader {
 				TmpFileType.EquivalentClass, TmpFileType.ComplementClass,
 				TmpFileType.DifferentIndividual, TmpFileType.SameIndividual,
 				TmpFileType.Domain, TmpFileType.Range, TmpFileType.Relationship,
-				TmpFileType.SubclassOf, TmpFileType.SubpropertyOf, TmpFileType.TypeOf
+				TmpFileType.SubclassOf, TmpFileType.SubpropertyOf,
+				TmpFileType.InversePropertyOf, TmpFileType.TypeOf
 		};
 
 		for (TmpFileType type : types) {
