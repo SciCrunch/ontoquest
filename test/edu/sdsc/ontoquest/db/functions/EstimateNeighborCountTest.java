@@ -16,7 +16,37 @@ public class EstimateNeighborCountTest extends OntoquestTestAdapter {
   // String kbName = "BIRNLex";
   int kbid = -1;
 
-  public void setUp() {
+  private void run(int rid, int rtid, String[] includedProperties,
+      boolean isSynonymIncluded, int edgeDirection,
+      boolean excludeHiddenRelationship, int level) throws OntoquestException {
+    OntoquestFunction<ResourceSet> f = new EstimateNeighborCount(rid, rtid, kbid,
+        includedProperties, edgeDirection,
+        excludeHiddenRelationship, level, true);
+    ResourceSet rs = f.execute(context, varList1);
+    while (rs.next()) {
+      System.out.println("neighbor count " + rs.getInt(1));
+    }
+    rs.close();
+  }
+
+  private void run(String[] names, String[] includedProperties,
+      boolean isSynonymIncluded, int edgeDirection,
+      boolean excludeHiddenRelationship, int level) throws OntoquestException {
+  	long time1 = System.currentTimeMillis();
+    OntoquestFunction<ResourceSet> f = new EstimateNeighborCount(names, kbid,
+        includedProperties, isSynonymIncluded, edgeDirection,
+        excludeHiddenRelationship, level, true);
+    ResourceSet rs = f.execute(context, varList1);
+    while (rs.next()) {
+      System.out.println("neighbor count " + rs.getInt(1));
+    }
+    rs.close();
+    long time2 = System.currentTimeMillis();
+    System.out.println("Total Running Time (ms, printing included): " + (time2-time1));
+  }
+
+  @Override
+	public void setUp() {
     super.setUp();
     try {
       // get IDs of terms
@@ -52,31 +82,5 @@ public class EstimateNeighborCountTest extends OntoquestTestAdapter {
     run(rid, rtid, includedProperties, isSynonymIncluded,
         EstimateNeighborCount.EDGE_OUTGOING, true, 3);
 
-  }
-
-  private void run(String[] names, String[] includedProperties,
-      boolean isSynonymIncluded, int edgeDirection,
-      boolean excludeHiddenRelationship, int level) throws OntoquestException {
-    OntoquestFunction<ResourceSet> f = new EstimateNeighborCount(names, kbid,
-        includedProperties, isSynonymIncluded, edgeDirection,
-        excludeHiddenRelationship, level, true);
-    ResourceSet rs = f.execute(context, varList1);
-    while (rs.next()) {
-      System.out.println("neighbor count " + rs.getInt(1));
-    }
-    rs.close();
-  }
-
-  private void run(int rid, int rtid, String[] includedProperties,
-      boolean isSynonymIncluded, int edgeDirection,
-      boolean excludeHiddenRelationship, int level) throws OntoquestException {
-    OntoquestFunction<ResourceSet> f = new EstimateNeighborCount(rid, rtid, kbid,
-        includedProperties, edgeDirection,
-        excludeHiddenRelationship, level, true);
-    ResourceSet rs = f.execute(context, varList1);
-    while (rs.next()) {
-      System.out.println("neighbor count " + rs.getInt(1));
-    }
-    rs.close();
   }
 }
