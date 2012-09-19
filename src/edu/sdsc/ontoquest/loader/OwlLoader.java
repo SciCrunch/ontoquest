@@ -599,10 +599,10 @@ public class OwlLoader {
 		if (object instanceof IRI) {
 			node = BDBUtil.searchNode(nodeCache, ((IRI) object).toString());
 			if (node == null 
-					&& (expectedType == null || expectedType.equals(NodeType.Literal))) { // not an OWL entity, maybe a incompletely defined RDF
-				// resource. Make it literal
-				OWLLiteral l = new OWLLiteralImpl(manager.getOWLDataFactory(),
-						((IRI) object).toString(), "en");
+					&& (expectedType == null || expectedType.equals(NodeType.Literal))) { 
+				// not an OWL entity, maybe a incompletely defined RDF resource. Make it literal
+				//TODO: Define the datatype properly...
+				OWLLiteral l = new OWLLiteralImpl(((IRI) object).toString(), "en", null);
 				node = saveLiteral(l);
 			}
 		} else if (object instanceof OWLAnonymousIndividual) {
