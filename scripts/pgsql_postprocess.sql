@@ -1,0 +1,18 @@
+select update_graph(id) from kb where name = ':ontName';
+
+--select * from create_dag_index(':ontName', 'has_part', true, true);
+
+--select * from create_dag_index(':ontName', 'subClassOf', false, true);
+
+-- for iDash pathway ontologies
+--select set_biopax_labels(id) from kb where name = ':ontName';
+
+--select fill_term_category(id, '''Anatomical object'', ''brain'', ''Cell'', ''Device'', ''Cellular Component'', ''extracellular structure'', ''cell line'', ''tissue section'', ''molecular entity'', ''Site'', ''Institution'', ''Platform'', ''Population'', ''Disease'', ''Biological_region'', ''gene'', ''Molecule role'', ''Drug'', ''Data object'', ''Assay'', ''Organism'', ''Data role'', ''Chemical role'', ''Reagent role'', ''familial role'', ''cell role'' , ''Quality'', ''Biomaterial_region'', ''Artifact Object'', ''Phenotype'', ''age'', ''Process'', ''behavioral process'', ''biological_process'', ''Regional Part Of Cell'', ''Resource''', '''sao1813327414'', ''birnlex_11013'', ''Function'', ''birnlex_2'', ''birnlex_2087'', ''nlx_res_20090101'', ''birnlex_6'', ''CHEBI_23367'', ''birnlex_11021''') from kb where name = ':ontName';
+
+--select fill_nif_cards();
+
+update kb set name = ':oldName' where name = ':finalName';
+
+update kb set name = ':finalName' where name = ':ontName';
+
+select delete_kb(':oldName');

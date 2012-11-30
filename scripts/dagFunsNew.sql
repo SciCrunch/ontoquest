@@ -1,4 +1,4 @@
----------------------------------------------
+﻿---------------------------------------------
 --              is_ancestor                -- 
 ---------------------------------------------
 CREATE OR REPLACE FUNCTION is_ancestor(rid1 INTEGER, rtid1 INTEGER, rid2 INTEGER, rtid2 INTEGER, thePid INTEGER)
@@ -69,6 +69,12 @@ BEGIN
   END IF;
 
   -- find the index for the input node.
+    sql := 'select distinct n2.rid, n2.rtid from (select extract_ancestor_from_idx(i1.idx, $1) '
+		   ||'from '||node_tbl_name||' n1, '||idx_tbl_name
+		   ||' i1 where n1.id = i1.nid and n1.rid = $2 and n1.rtid = $3) as anc(nid), '
+		   ||node_tbl_name||' n2 where anc.nid = n2.id';
+
+		   /*
   IF level is not null and level > 0 THEN
     sql := 'select n.rid, n.rtid from '||node_tbl_name||' n, (select distinct t2.nid from '
           ||idx_tbl_name||' t1, '||idx_tbl_name||' t2, '|| node_tbl_name
@@ -81,7 +87,8 @@ BEGIN
           ||' n1 where t1.nid != t2.nid and n1.id = t1.nid and n1.rid = $2 and n1.rtid = $3 and'
           ||' to_tsvector(''english'', t1.idx)@@to_tsquery(''''''''||t2.nid||'''''''')) t where n.id = t.nid';
   END IF;
-  
+ */
+ 
   FOR rec IN EXECUTE sql using level, rid, rtid
   LOOP
     RETURN NEXT rec;
@@ -296,5 +303,49 @@ CREATE OR REPLACE FUNCTION get_neighbor_count(term_list_str VARCHAR, pname_list_
     END IF;
 
     return result;
+  END;
+$$ LANGUAGE plpgsql;
+
+---------------------------------------------
+--       extract_ancestor_from_idx         -- 
+---------------------------------------------
+CREATE OR REPLACE FUNCTION extract_ancestor_from_idx(idx VARCHAR, level INTEGER) 
+  RETURNS setof int AS $$
+  DECLARE
+    nodeArray text[];
+	beginIdx integer := 1;
+	endIdx integer;
+	length integer;
+	finalLevel integer;
+  BEGIN
+    IF level is null THEN
+	  finalLevel := 0;
+	ELSE
+      finalLevel := level;
+	END IF;
+	
+    select string_to_array(idx, ' ') into nodeArray;
+	IF nodeArray is null THEN
+	  RETURN;
+	END IF;
+	
+	-- empty or only one element in the idx which means the node is a root. 
+	length := array_length(nodeArray, 1);
+	IF length <= 1 THEN
+	  RETURN;
+	END IF;
+	
+	IF length > level + 1 AND level > 0 THEN
+	  beginIdx := length - level;
+	ELSE
+	  beginIdx := 1;
+	END IF;
+	
+	endIdx := length - 1;
+	
+	FOR i IN beginIdx .. endIdx LOOP
+	  RETURN NEXT nodeArray[i];
+	END LOOP;
+	RETURN;
   END;
 $$ LANGUAGE plpgsql;

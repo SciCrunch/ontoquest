@@ -17,7 +17,7 @@ CREATE TABLE nif_brain_region_all (
   id serial primary key,
   rid integer NOT NULL,
   rtid integer NOT NULL,
-  concept_id text NOT NULL,
+  concept_id text,
   preferred_label text,
   label text,
   neuronames_id text,
@@ -107,7 +107,7 @@ CREATE OR REPLACE FUNCTION fill_nif_brain_region() RETURNS VOID AS $$
     select into theKbid id from kb where name = 'NIF';
 
     INSERT INTO nif_tmp_b (rid, rtid, concept_id, superclass) (SELECT rid1, rtid1, name1, trim(str_agg(name2||' ')) FROM 
-      get_neighborhood(root, '''subClassOf''', null, theKbid, false, 0, true, false, true, false, true) group by rid1, rtid1, name1);
+      get_neighborhood(root, '''subClassOf''', null, theKbid, false, 0, true, true, true, false, true) group by rid1, rtid1, name1);
 
     INSERT INTO nif_tmp_b (rid, rtid, concept_id, superpart) (SELECT rid2, rtid2, name2, trim(str_agg(name1||' ')) FROM 
       get_neighborhood(partof_root, '''has_part''', null, theKbid, false, 0, true, true, true, false, false) group by rid2, rtid2, name2);
@@ -146,7 +146,7 @@ CREATE OR REPLACE FUNCTION fill_nif_cell() RETURNS VOID AS $$
     select into theKbid id from kb where name = 'NIF';
 
     INSERT INTO nif_cell (rid, rtid, concept_id, parent) (SELECT rid1, rtid1, name1, trim(str_agg(name2||' ')) FROM 
-      get_neighborhood(root, '''subClassOf''', null, theKbid, false, 0, true, false, true, false, true) group by rid1, rtid1, name1);
+      get_neighborhood(root, '''subClassOf''', null, theKbid, false, 0, true, true, true, false, true) group by rid1, rtid1, name1);
 
     UPDATE nif_cell SET label = (SELECT get_name(rid, rtid, true, null));
 
@@ -209,7 +209,7 @@ CREATE OR REPLACE FUNCTION fill_nif_brain_cell() RETURNS VOID AS $$
     LOOP
       INSERT INTO nif_tmp_bc (brain_region_id, cell_id, derived) 
         SELECT r.id, rec.cell_id, true FROM nif_brain_region_all r, (select rid2, rtid2 from 
-        get_neighborhood(ARRAY[[rec.rid, rec.rtid]], '''subClassOf''', null, theKbid, false, 0, true, false, true, false)) t 
+        get_neighborhood(ARRAY[[rec.rid, rec.rtid]], '''subClassOf''', null, theKbid, false, 0, true, true, true, false)) t 
         WHERE r.rid = t.rid2 and r.rtid = t.rtid2;
     END LOOP;
     
@@ -245,7 +245,7 @@ CREATE OR REPLACE FUNCTION fill_nif_disease() RETURNS VOID AS $$
     select into theKbid id from kb where name = 'NIF';
 
     INSERT INTO nif_disease (rid, rtid, concept_id, parent) (SELECT rid1, rtid1, name1, trim(str_agg(name2||' ')) FROM 
-      get_neighborhood(root, '''subClassOf''', null, theKbid, false, 0, true, false, true, false, true) group by rid1, rtid1, name1);
+      get_neighborhood(root, '''subClassOf''', null, theKbid, false, 0, true, true, true, false, true) group by rid1, rtid1, name1);
 
     UPDATE nif_disease SET label = (SELECT get_name(rid, rtid, true, null));
 

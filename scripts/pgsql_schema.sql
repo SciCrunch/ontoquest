@@ -9,11 +9,11 @@
 
 \i edit_distance.sql
 
-\i createDAGTable.sql
+\i createDAGTableNew.sql
 
-\i computeDAGIndex.sql
+\i computeDAGIndexNew.sql
 
-\i dagFuns.sql
+\i dagFunsNew.sql
 
 \i computeGoodnessScore.sql
 

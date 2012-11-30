@@ -22,15 +22,20 @@ CREATE TABLE term_category_tbl (
   rtid integer,
   category text,
   cat_rid integer,
-  cat_rtid integer
+  cat_rtid integer,
+  cm_type text,
+  cm_type_rid integer,
+  cm_type_rtid integer
   ,primary key (rid, rtid, cat_rid, cat_rtid)
 );
 
 CREATE OR REPLACE VIEW term_category AS
-  select t.term, t.tid, t.rid, t.rtid, t.inferred, t.is_acronym, t.is_abbrev, tc.category, tc.cat_rid, tc.cat_rtid from nif_term t left outer join term_category_tbl tc
+  select t.term, t.tid, t.rid, t.rtid, t.inferred, t.is_acronym, t.is_abbrev, tc.category, tc.cat_rid, tc.cat_rtid
+  , tc.cm_type, tc.cm_type_rid, tc.cm_type_rtid
+  from nif_term t left outer join term_category_tbl tc
   on (t.rid = tc.rid and t.rtid = tc.rtid);
 
-CREATE OR REPLACE FUNCTION fill_term_category(theKbid INTEGER, category_list_str TEXT) RETURNS VOID AS $$
+CREATE OR REPLACE FUNCTION fill_term_category(theKbid INTEGER, category_list_str TEXT, cm_type_list_str TEXT) RETURNS VOID AS $$
 /*
   fills table term_category. Extract all terms (class label + synonyms) in the specified kbid and their
   class name (tid), then populate the term_category table. For each term, if it is a subclass of
@@ -53,6 +58,11 @@ DECLARE
   currRow RECORD;
   h integer;
   hasFound boolean;
+  
+  theRid integer;
+  theRtid integer;
+  theName text;
+
 BEGIN
     -- retrieve IDs of the categories.
     IF theKbid is not null THEN
@@ -134,7 +144,7 @@ BEGIN
   DELETE FROM nif_term where term = '';
   
   select into counter count(*) from nif_term;
---  raise notice 'insert all terms and their ids. Count = %', counter;
+  raise notice 'insert all terms and their ids. Count = %', counter;
 
   -- create hierarchy in input categories. Put the hierarchy in temporary table tmp_cat_tree
   -- first, iterate category pairs. For every pair, check if there exist ancestor-descendant relationship.
@@ -151,20 +161,22 @@ BEGIN
   FOR rec1 IN select desc_rid, desc_rtid from tmp_cat_tree order by height
   LOOP
     insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid) select distinct rid1, rtid1, rec1.desc_rid, rec1.desc_rtid 
-      from get_neighborhood(rec1.desc_rid, rec1.desc_rtid, subclassPid, false, 0, true, false, true, true) t, nif_term nt
+      from get_neighborhood(rec1.desc_rid, rec1.desc_rtid, subclassPid, false, 0, true, true, true, true) t, nif_term nt
       where t.rid1 = nt.rid and t.rtid1 = nt.rtid;
 --    raise notice 'add all descendants of category %, %', rec1.desc_rid, rec1.desc_rtid;
   END LOOP;
-
+  raise notice 'Inserted all categories for all terms';
+  
   -- For every (rid, rtid, cat_rid, cat_rtid) pair, get category (cat_rid, cat_rtid)'s superclasses (sc_rid, sc_rtid), 
   -- remove all pairs (rid, rtid, sc_rid, sc_rtid) in term_category_tbl.
   FOR rec2 IN select desc_rid, desc_rtid from tmp_cat_tree
   LOOP
    delete from term_category_tbl tc1 where (rid, rtid, cat_rid, cat_rtid) in (select tc2.rid, tc2.rtid, ne.rid2, ne.rtid2 
       from term_category_tbl tc2, get_neighborhood(rec2.desc_rid, rec2.desc_rtid, subclassPid, false, 0, true, 
-      false, true, false) ne where tc2.cat_rid = rec2.desc_rid and tc2.cat_rtid = rec2.desc_rtid);
+      true, true, false) ne where tc2.cat_rid = rec2.desc_rid and tc2.cat_rtid = rec2.desc_rtid);
 --    raise notice 'delete redundant descendants of category %, %', rec2.desc_rid, rec2.desc_rtid;
   END LOOP;
+  raise notice 'Deleted all redundant descendants of categories.';
 
   -- fill the label for categories
   update term_category_tbl tc set category = (select n.name from graph_nodes n, graph_edges e, property p 
@@ -172,11 +184,20 @@ BEGIN
     tc.cat_rtid = e.rtid1);
 
   update term_category_tbl set category = get_name(cat_rid, cat_rtid, true, null) where category is null;
---  raise notice 'category label is updated';
+  raise notice 'category label is updated';
+
+  -- fill the concept map types
+  sql := 'select * from get_ids('||quote_literal(cm_type_list_str)||', true, false, '||kb_expr||') t where t.rtid = 1';
+
+  FOR theRid, theRtid, theName IN EXECUTE sql
+  LOOP
+    update term_category_tbl tc set (cm_type_rid, cm_type_rtid, cm_type) = (theRid, theRtid, theName) 
+      where (tc.rid, tc.rtid) in (select rid, rtid from get_descendant_nodes_in_dag(theRid, theRtid, subclassPid, 0, true, true));
+  END LOOP;
 
   EXECUTE 'drop table tmp_cat_tree';
 END;
 $$ LANGUAGE plpgsql;
 
 -- usage
---select fill_term_category(:kbid, '''Anatomical object'', ''brain'', ''Cell'', ''Device'', ''Cellular Component'', ''extracellular structure'', ''cell line'', ''tissue section'', ''molecular entity'', ''Site'', ''Institution'', ''Platform'', ''Population'', ''Disease'', ''Biological_region'', ''gene'', ''Molecule role'', ''Drug'', ''Data object'', ''Assay'', ''Organism'', ''Data role'', ''Chemical role'', ''Reagent role'', ''familial role'', ''cell role'' , ''Quality'', ''Biomaterial_region'', ''Artifact Object'', ''Phenotype'', ''age'', ''Process'', ''behavioral process'', ''biological_process'', ''Regional Part Of Cell'', ''Resource''');
+--select fill_term_category(:kbid, '''Anatomical object'', ''brain'', ''Cell'', ''Device'', ''Cellular Component'', ''extracellular structure'', ''cell line'', ''tissue section'', ''molecular entity'', ''Site'', ''Institution'', ''Platform'', ''Population'', ''Disease'', ''Biological_region'', ''gene'', ''Molecule role'', ''Drug'', ''Data object'', ''Assay'', ''Organism'', ''Data role'', ''Chemical role'', ''Reagent role'', ''familial role'', ''cell role'' , ''Quality'', ''Biomaterial_region'', ''Artifact Object'', ''Phenotype'', ''age'', ''Process'', ''behavioral process'', ''biological_process'', ''Regional Part Of Cell'', ''Resource''', '''birnlex_6'', ''sao1813327414'', ''birnlex_11013'', ''Function'', ''CHEBI_23367'', ''birnlex_2'', ''birnlex_2087'', ''birnlex_11021'', ''nlx_res_20090101''');

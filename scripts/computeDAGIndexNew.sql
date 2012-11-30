@@ -1,4 +1,4 @@
-CREATE OR REPLACE FUNCTION create_dag_index(kb_name TEXT, property_name TEXT, subject_root BOOLEAN, collect_stats BOOLEAN) 
+﻿CREATE OR REPLACE FUNCTION create_dag_index(kb_name TEXT, property_name TEXT, subject_root BOOLEAN, collect_stats BOOLEAN) 
   RETURNS SETOF INTEGER AS $$
 /* A convinient function to create dag index */
 DECLARE
@@ -285,7 +285,7 @@ CREATE OR REPLACE FUNCTION compute_dag_neighbor_count(dag_id INTEGER)
     rec RECORD;
     node_tbl_name TEXT;
     idx_tbl_name TEXT;
-    maxHops INTEGER := 5;
+    maxHops INTEGER := 2;
     i INTEGER;
     j INTEGER;
     create_tbl_sql TEXT;
@@ -358,12 +358,9 @@ CREATE OR REPLACE FUNCTION compute_dag_neighbor_count(dag_id INTEGER)
 
 $$ LANGUAGE plpgsql;
 
-
+/*
 CREATE OR REPLACE FUNCTION compute_dag_neighbor_count2(dag_id INTEGER) 
   RETURNS VOID AS $$
-/*
-    pre-compute and store the count of descendants for the DAG specified by dag_id
-*/
   DECLARE
     rec RECORD;
     node_tbl_name TEXT;
@@ -395,20 +392,20 @@ CREATE OR REPLACE FUNCTION compute_dag_neighbor_count2(dag_id INTEGER)
     EXECUTE 'insert into tmp_dag_cnt(id, desc_total) select t2.nid, count(distinct t1.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
           ' t2 where strpos(t1.idx, t2.idx||'' '') = 1 group by t2.nid';
     
-    EXECUTE 'update tmp_dag_cnt c set anc_total = count(distinct t1.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
-          ' t2 where strpos(t2.idx, t1.idx||'' '') = 1 and c.id = t2.nid';
+    EXECUTE 'update tmp_dag_cnt c set anc_total = (select count(distinct t1.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
+          ' t2 where strpos(t2.idx, t1.idx||'' '') = 1 and c.id = t2.nid)';
  
   
     FOR i IN 1..maxHops LOOP
-      EXECUTE 'update tmp_dag_cnt c set desc_'||i||'= count(distinct t1.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
+      EXECUTE 'update tmp_dag_cnt c set desc_'||i||'= (select count(distinct t1.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
         ' t2 where (array_length(regexp_split_to_array(t1.idx, E''\\\\s+''), 1) - '||
         ' array_length(regexp_split_to_array(t2.idx, E''\\\\s+''), 1)) = $1 and strpos(t1.idx, t2.idx||'' '') = 1 '||
-        ' and t2.nid = c.id' using i;
+        ' and t2.nid = c.id)' using i;
     
-      EXECUTE 'update tmp_dag_cnt c set anc_'||i||'= count(distinct t2.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
+      EXECUTE 'update tmp_dag_cnt c set anc_'||i||'= (select count(distinct t2.nid) from '||idx_tbl_name||' t1, '||idx_tbl_name||
         ' t2 where (array_length(regexp_split_to_array(t1.idx, E''\\\\s+''), 1) - '||
         ' array_length(regexp_split_to_array(t2.idx, E''\\\\s+''), 1)) = $1 and strpos(t1.idx, t2.idx||'' '') = 1 '||
-        ' and t1.nid = c.id' using i;
+        ' and t1.nid = c.id)' using i;
     
     END LOOP;
     
@@ -436,3 +433,4 @@ CREATE OR REPLACE FUNCTION compute_dag_neighbor_count2(dag_id INTEGER)
   END;
 
 $$ LANGUAGE plpgsql;
+*/

@@ -445,7 +445,17 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 		
 	END LOOP;
  
-	END;
+    -- for inversedOf property, add its inversed edge
+    INSERT INTO graph_edges_all select distinct g.rid2, g.rtid2, ip.propertyid2 as pid, g.rid1, g.rtid1, g.kbid, true, g.hidden, g.restriction_type, g.restriction_stmt
+      from graph_edges_all g, inversepropertyof ip where g.pid = ip.propertyid1 and g.kbid = theKbid and not exists (select * from graph_edges_all g2 where g2.rid1 = g.rid2 and
+      g2.rtid1 = g.rtid2 and g2.pid = ip.propertyid2 and g2.rid2 = g.rid1 and g2.rtid2 = g.rtid1 and g2.kbid = g.kbid);
+    raise notice 'added inferred inversedOf relationships as edges';
+
+    INSERT INTO graph_edges_all select distinct g.rid2, g.rtid2, ip.propertyid1 as pid, g.rid1, g.rtid1, g.kbid, true, g.hidden, g.restriction_type, g.restriction_stmt
+      from graph_edges_all g, inversepropertyof ip where g.pid = ip.propertyid2 and g.kbid = theKbid and not exists (select * from graph_edges_all g2 where g2.rid1 = g.rid2 and
+      g2.rtid1 = g.rtid2 and g2.pid = ip.propertyid1 and g2.rid2 = g.rid1 and g2.rtid2 = g.rtid1 and g2.kbid = g.kbid);
+
+  END;
 $$ LANGUAGE plpgsql;
 
 CREATE OR REPLACE FUNCTION update_inference_edges2(theKbid integer)
@@ -1160,12 +1170,6 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
 	  from datatype_restriction t, resourcetype rt, resourcetype rt2
 	  where rt.rtype = 'e' and rt2.rtype = 'l' and t.kbid = theKbid;
 	  
-    -- for inversedOf property, add its inversed edge
-    INSERT INTO graph_edges_all select distinct g.rid2, g.rtid2, ip.propertyid2 as pid, g.rid1, g.rtid1, g.kbid, true, g.hidden, g.restriction_type, g.restriction_stmt
-      from graph_edges_all g, inversepropertyof ip where g.pid = ip.propertyid1 and g.kbid = theKbid and not exists (select * from graph_edges_all g2 where g2.rid1 = g.rid2 and
-      g2.rtid1 = g.rtid2 and g2.pid = ip.propertyid2 and g2.rid2 = g.rid1 and g2.rtid2 = g.rtid1 and g2.kbid = g.kbid);
-    raise notice 'added inferred inversedOf relationships as edges';
-
 --    perform update_inference_edges(theKbid);
 	
     -- update status of some hidden edges. If a restriction appears as object of another non-hidden edge, set the corresponding restriction edge to non-hidden.
