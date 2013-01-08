@@ -5,7 +5,7 @@ import org.restlet.resource.ClientResource;
 import edu.sdsc.ontoquest.OntoquestTestAdapter;
 
 /**
- * @version $Id: RESTClient.java,v 1.5 2012-04-30 22:45:03 xqian Exp $
+ * @version $Id: RESTClient.java,v 1.6 2013-01-08 23:38:57 xqian Exp $
  *
  */
 public class RESTClient extends OntoquestTestAdapter {
@@ -86,10 +86,10 @@ public class RESTClient extends OntoquestTestAdapter {
 	}
 
 	public void testSearch() throws Exception {
-		run("http://localhost:8182/ontoquest/concepts/search/cerebellum");
+		// run("http://localhost:8182/ontoquest/concepts/search/cerebellum");
 		//  run("http://localhost:8182/ontoquest/concepts/search/ammon%27s+horn");
-		//  run("http://localhost:8182/ontoquest/concepts/search/birnlex_276");
-		//		    run("http://localhost:8182/ontoquest/concepts/search/cerebellum?ontology=NIF_old&begin_with=true&max_ed=30&result_limit=10");
+		run("http://localhost:8182/ontoquest/concepts/search/DOID_13891");
+		// run("http://localhost:8182/ontoquest/concepts/search/cerebellum?ontology=NIF_old&begin_with=true&max_ed=30&result_limit=10");
 		//		    run("http://nif-services.neuinfo.org/ontoquest/concepts/search/cerebellum?ontology=NIF_old&begin_with=true&max_ed=30&result_limit=10");
 	}
 
