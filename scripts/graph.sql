@@ -426,7 +426,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 		-- e.g. Wine -- subclassOf/equivalent/intersectionOf -> (something --:forall:hasMaker-> Winery) will generate:
 		-- Wine -- :forall:hasMaker -> Winery
 		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
-        from allvaluesfromclass t, graph_edges s, resourcetype rt, property p
+        from allvaluesfromclass t, graph_edges_all s, resourcetype rt, property p
         where s.rid2 = t.id and s.rtid2 = rt.id and rt.rtype = 'v' and s.pid = p.id and p.name in ('equivalentClass', 'subClassOf', 'intersectionOf')
         and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
         and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
@@ -435,7 +435,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
   raise notice 'Iteration %, inserted inferred allValuesFrom classes', j;
 		  
 		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
-      from somevaluesfromclass t, graph_edges s, resourcetype rt, property p
+      from somevaluesfromclass t, graph_edges_all s, resourcetype rt, property p
       where s.rid2 = t.id and s.rtid2 = rt.id and rt.rtype = 'v' and s.pid = p.id and p.name in ('equivalentClass', 'subClassOf', 'intersectionOf')
       and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
       and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
@@ -500,7 +500,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges2(theKbid integer)
 	-- e.g. if someone improperly declared A subClassOf B, A equivalentClass B, we will have cycles after adding
 	-- inference edges. In this case, we shall remove inference edges.
 	DELETE FROM graph_edges_all e1 where pid in (select id from property where name = 'subClassOf' and kbid=theKbid) 
-	and exists (select * from graph_edges e2 where e1.pid = e2.pid and
+	and exists (select * from graph_edges_all e2 where e1.pid = e2.pid and
 	e1.rid1 = e2.rid2 and e1.rtid1 = e2.rtid2 and e1.rid2 = e2.rid1 and e1.rtid2 = e2.rtid2) and derived = true;
   raise notice 'Delete improper subClassOf relationships';
 
@@ -516,13 +516,13 @@ CREATE OR REPLACE FUNCTION update_inference_edges2(theKbid integer)
 	-- Handle inverseOf properties, e.g. p1 inverseOf p2. For all edges involving p1, e.g. X p1 Y, add Y p2 X into the graph
 	INSERT INTO graph_edges_all select e.rid2, e.rtid2, i.propertyid2, e.rid1, e.rtid1, e.kbid, true, e.hidden, e.restriction_type, 
 	e.restriction_stmt, e.is_obsolete from graph_edges_all e, inversepropertyof i where 
-	e.pid = i.propertyid1 and i.propertyid1 != i.propertyid2 and not exists (select * from graph_edges e2 where e.rid2 = e2.rid1 
+	e.pid = i.propertyid1 and i.propertyid1 != i.propertyid2 and not exists (select * from graph_edges_all e2 where e.rid2 = e2.rid1 
 	and e.rtid2 = e2.rtid1 and i.propertyid2 = e2.pid and e.rid1 = e2.rid2 and e.rtid1 = e2.rtid2) and i.kbid = theKbid;
   raise notice 'Inserted inferred inverseOf relationship type 1';
 
 	INSERT INTO graph_edges_all select e.rid2, e.rtid2, i.propertyid1, e.rid1, e.rtid1, e.kbid, true, e.hidden, e.restriction_type, 
 	e.restriction_stmt, e.is_obsolete from graph_edges_all e, inversepropertyof i where 
-	e.pid = i.propertyid2 and i.propertyid1 != i.propertyid2 and not exists (select * from graph_edges e2 where e.rid2 = e2.rid1 
+	e.pid = i.propertyid2 and i.propertyid1 != i.propertyid2 and not exists (select * from graph_edges_all e2 where e.rid2 = e2.rid1 
 	and e.rtid2 = e2.rtid1 and i.propertyid1 = e2.pid and e.rid1 = e2.rid2 and e.rtid1 = e2.rtid2) and i.kbid = theKbid;
   raise notice 'Inserted inferred inverseOf relationship type 2';
 

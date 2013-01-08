@@ -435,7 +435,7 @@ CREATE TABLE primitiveclass (
   is_system boolean default false,
   is_owlclass boolean default true, -- is owl:Class (true) or rdfs:Class (false)?
   is_deprecated boolean default false, -- is owl:DeprecatedClass?
-  nsid integer NOT NULL REFERENCES namespace (id) ON DELETE CASCADE,
+  nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
 );
