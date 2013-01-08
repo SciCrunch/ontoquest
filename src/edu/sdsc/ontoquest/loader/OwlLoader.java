@@ -114,6 +114,7 @@ import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.db.DbConnectionPool;
 import edu.sdsc.ontoquest.db.DbContext;
 import edu.sdsc.ontoquest.db.DbUtility;
+import edu.sdsc.ontoquest.db.ScriptRunner;
 import edu.sdsc.ontoquest.loader.TmpDataManager.TmpFileType;
 import edu.sdsc.ontoquest.loader.struct.IdCounter;
 import edu.sdsc.ontoquest.loader.struct.NamespaceEntity;
@@ -129,6 +130,9 @@ public class OwlLoader {
 
 		@Option(name = "-d", usage = "ontology file", required = true)
 		public String owlFilePath;
+
+		@Option(name = "-s", usage = "run post-processing script? (true|false, default=false)")
+		public boolean runPostScript = false;
 	}
 
 	private static final String DEFAULT_CONFIG_FILE = "config/ontoquest.xml";
@@ -160,6 +164,9 @@ public class OwlLoader {
 		OwlLoader loader = new OwlLoader(configFilePath, options.owlFilePath);
 		loader.run();
 
+		if (options.runPostScript) {
+			loader.runPostScript();
+		}
 		System.exit(0);
 	}
 
@@ -599,10 +606,10 @@ public class OwlLoader {
 		if (object instanceof IRI) {
 			node = BDBUtil.searchNode(nodeCache, ((IRI) object).toString());
 			if (node == null 
-					&& (expectedType == null || expectedType.equals(NodeType.Literal))) { 
-				// not an OWL entity, maybe a incompletely defined RDF resource. Make it literal
-				//TODO: Define the datatype properly...
-				OWLLiteral l = new OWLLiteralImpl(((IRI) object).toString(), "en", null);
+					&& (expectedType == null || expectedType.equals(NodeType.Literal))) { // not an OWL entity, maybe a incompletely defined RDF
+				// resource. Make it literal
+				OWLLiteral l = new OWLLiteralImpl(manager.getOWLDataFactory(),
+						((IRI) object).toString(), "en");
 				node = saveLiteral(l);
 			}
 		} else if (object instanceof OWLAnonymousIndividual) {
@@ -718,6 +725,7 @@ public class OwlLoader {
 							+ "currency symbol('$'), \nconnecting punctuation character('_'), space(' '), and combining mark.");
 		}
 
+		ontName = ontName + "_tmp";
 		conPool = new DbConnectionPool(driver, url, user, password);
 		context = new DbContext(conPool);
 		tmpDataManager = new TmpDataManager(config);
@@ -1187,6 +1195,7 @@ public class OwlLoader {
 			long time2 = System.currentTimeMillis();
 			log.info("The ontology " + ontName
 					+ " has been saved. Total time (sec): " + (time2 - time1) / 1000);
+
 		} catch (Exception e) {
 			try {
 				con.rollback();
@@ -1200,6 +1209,16 @@ public class OwlLoader {
 			con.commit();
 			conPool.releaseConnection(con);
 		}
+	}
+
+	public void runPostScript() throws Exception {
+		long time1 = System.currentTimeMillis();
+		ScriptRunner runner = new ScriptRunner(AllConfiguration.getConfig(),
+				conPool);
+		runner.run();
+		long time2 = System.currentTimeMillis();
+		log.info("The post-processing script for " + ontName
+				+ " is finished. It takes " + (time2 - time1) / 60000 + " minutes.");
 	}
 
 	@SuppressWarnings("rawtypes")
@@ -1657,6 +1676,13 @@ public class OwlLoader {
 					"Couldn't find the individual of NaryIndividualAxiom in database: "
 							+ pair.get(1));
 
+		if (node1.getType() != NodeType.Individual
+				|| node2.getType() != NodeType.Individual) {
+			log.info("Skip mismatched Node Types. Expecting two individuals. Got node1 ("
+					+ node1.getType() + ") " + node1.toString() + "; node2 ("
+					+ node2.getType() + ") " + node2.toString());
+			return;
+		}
 		// line: rid1, rid2, kbid
 		printLine(writer, node1.getRid(), node2.getRid(), kbid);
 	}
