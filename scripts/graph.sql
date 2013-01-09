@@ -1,7 +1,7 @@
-﻿/*drop table if exists graph_edges_all cascade;
+drop table if exists graph_edges_all cascade;
 
 drop table if exists graph_nodes_all cascade;
-*/
+
 /*
  * The node table in graph view. Each node is identified by (rid, rtid) pair.
  * @col rid -- resource id.
@@ -13,7 +13,6 @@ drop table if exists graph_nodes_all cascade;
  * anonymous is hidden from user. 
  * @col is_obsolete -- if true, the node is deprecated.
  */
-/*
 create table graph_nodes_all (
   rid integer NOT NULL,
   rtid integer NOT NULL,
@@ -37,7 +36,7 @@ CREATE INDEX node_label ON graph_nodes_all(label);
 CREATE INDEX node_label2 ON graph_nodes_all(lower(label), is_obsolete, kbid);
 
 create view graph_nodes as select * from graph_nodes_all where is_obsolete = false;
-*/
+
 /*
  * The edge table in graph view. It contains the edge list in the graph.
  * @col rid1 -- resource id of node 1 (source node)
@@ -55,7 +54,7 @@ create view graph_nodes as select * from graph_nodes_all where is_obsolete = fal
  * @col restriction_stmt -- the restriction statement (text to be shown along with the edge label).
  * @col is_obsolete -- if true, the edge is deprecated.
  */
-/*
+
 create table graph_edges_all (
   rid1 integer NOT NULL,
   rtid1 integer NOT NULL,
@@ -83,7 +82,7 @@ CREATE INDEX edge_pid ON graph_edges_all (pid);
 CREATE INDEX edge_kbid ON graph_edges_all (kbid);
 
 create view graph_edges as select * from graph_edges_all where is_obsolete = false;
-*/
+
 
 CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursive BOOLEAN) RETURNS TEXT AS $$
 /*
