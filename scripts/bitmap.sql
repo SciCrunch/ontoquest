@@ -1,4 +1,4 @@
-﻿
+
 DROP TYPE IF EXISTS bm_bitvector CASCADE;
 
 create type bm_bitvector as (

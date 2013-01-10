@@ -1,4 +1,4 @@
-﻿---------------------------------------------
+---------------------------------------------
 --              is_ancestor                -- 
 ---------------------------------------------
 CREATE OR REPLACE FUNCTION is_ancestor(rid1 INTEGER, rtid1 INTEGER, rid2 INTEGER, rtid2 INTEGER, thePid INTEGER)

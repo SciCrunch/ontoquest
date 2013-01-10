@@ -1,4 +1,4 @@
-﻿CREATE OR REPLACE FUNCTION create_dag_index(kb_name TEXT, property_name TEXT, subject_root BOOLEAN, collect_stats BOOLEAN) 
+CREATE OR REPLACE FUNCTION create_dag_index(kb_name TEXT, property_name TEXT, subject_root BOOLEAN, collect_stats BOOLEAN) 
   RETURNS SETOF INTEGER AS $$
 /* A convinient function to create dag index */
 DECLARE

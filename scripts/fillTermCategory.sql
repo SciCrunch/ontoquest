@@ -1,4 +1,4 @@
-﻿select drop_if_exists('term_category');
+select drop_if_exists('term_category');
 
 select drop_if_exists('term_category_tbl');
 

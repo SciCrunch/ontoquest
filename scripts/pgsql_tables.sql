@@ -1,4 +1,4 @@
-﻿/* 
+/* 
 Changes from IODT schema:
 1. Add kbid into each table. There is no need to create a whole set of tables for each ontology. 
    It makes easier to create inter-ontology relationships. 
