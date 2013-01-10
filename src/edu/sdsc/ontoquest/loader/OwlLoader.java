@@ -955,26 +955,26 @@ public class OwlLoader {
 		Set<OWLDisjointDataPropertiesAxiom> axioms = ontology
 				.getAxioms(AxiomType.DISJOINT_DATA_PROPERTIES);
 		for (OWLDisjointDataPropertiesAxiom axiom : axioms) {
-			throw new OntoquestException("Not implemented!");
+			// throw new OntoquestException("Not implemented!");
 		}
 
 		Set<OWLDisjointObjectPropertiesAxiom> axioms2 = ontology
 				.getAxioms(AxiomType.DISJOINT_OBJECT_PROPERTIES);
 		for (OWLDisjointObjectPropertiesAxiom axiom : axioms2) {
-			throw new OntoquestException("Not implemented!");
+			// throw new OntoquestException("Not implemented!");
 		}
 
 		PrintWriter writer2 = tmpDataManager.getWriter(TmpFileType.EquivalentClass);
 		Set<OWLEquivalentDataPropertiesAxiom> axioms3 = ontology
 				.getAxioms(AxiomType.EQUIVALENT_DATA_PROPERTIES);
 		for (OWLEquivalentDataPropertiesAxiom axiom : axioms3) {
-			throw new OntoquestException("Not implemented!");
+			// throw new OntoquestException("Not implemented!");
 		}
 
 		Set<OWLEquivalentObjectPropertiesAxiom> axioms4 = ontology
 				.getAxioms(AxiomType.EQUIVALENT_OBJECT_PROPERTIES);
 		for (OWLEquivalentObjectPropertiesAxiom axiom : axioms4) {
-			throw new OntoquestException("Not implemented!");
+			// throw new OntoquestException("Not implemented!");
 		}
 
 	}
