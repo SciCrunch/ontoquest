@@ -274,7 +274,7 @@ CREATE TABLE property (
   is_annotation boolean default false, -- is annotation property?
   is_system boolean default false, -- protege-related field
   is_deprecated boolean default false, -- is owl:DeprecatedProperty?
-  nsid integer NOT NULL REFERENCES namespace (id) ON DELETE CASCADE,
+  nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE
   , browsertext text
   , is_reflexive boolean default false
