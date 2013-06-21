@@ -13,19 +13,73 @@ import edu.sdsc.ontoquest.Context;
 import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.OntoquestFunction;
 import edu.sdsc.ontoquest.ResourceSet;
+import edu.sdsc.ontoquest.db.DbContext;
+import edu.sdsc.ontoquest.db.DbResourceSet;
+import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.db.functions.GetNeighbors;
 import edu.sdsc.ontoquest.db.functions.GetOntologyURL;
 import edu.sdsc.ontoquest.query.Utility;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
+
 /**
- * @version $Id: ClassNode.java,v 1.3 2012-06-23 17:19:27 xqian Exp $
+ * @version $Id: ClassNode.java,v 1.4 2013-06-21 22:23:29 jic002 Exp $
  *
  */
 public class ClassNode extends BaseBean {
 
+  protected static String interanIdAttrName = "InternalId";
+
 	public static String generateId(int rid, int rtid) {
 		return rid+"-"+rtid;
 	}
+  
+  public static String generateExtId ( int rid, int rtid, Context context ) 
+     throws OntoquestException
+  {
+    
+    Connection conn = null;
+    String id = null;
+    ResultSet rs=null;
+    
+    String sql = "select name from graph_nodes_all where rid=" + rid +
+               " and rtid="+rtid;
+    try {
+      // System.out.println(sql);
+      conn = DbUtility.getDBConnection(context);
+      Statement stmt = conn.createStatement();
+      rs = stmt.executeQuery(sql);
+      while (rs.next()) 
+      {
+        id = rs.getString(1);
+      }
+      rs.close();
+      stmt.close();
+      DbUtility.releaseDbConnection(conn, context);
+      if (id != null)
+        return id;
+      else
+        throw new OntoquestException(OntoquestException.Type.BACKEND, 
+                 "Can't find id for rid="+rid+" and rtid="+rtid+ "in db."); 
+    } catch (Exception e) {
+      try {
+        rs.close();
+      } catch (Exception e2) {
+      }
+      DbUtility.releaseDbConnection(conn, context);
+      if (!(e instanceof OntoquestException)) {
+        e.printStackTrace();
+        throw new OntoquestException(OntoquestException.Type.BACKEND,
+            "Error occurs when getting id of rid="+rid+ ",rtid="+rtid, e);
+      } else {
+        throw (OntoquestException) e; // throw ontoquest exception up
+      }
+    }
+  }
+
+
 	private static HashMap<String, ClassNode> getNodeMap(
 			OntoquestFunction<ResourceSet> f,
 			boolean useLabel, int[][] ontoIDs, Context context)
@@ -540,7 +594,8 @@ public class ClassNode extends BaseBean {
 
 		Element idElem = doc.createElement("id");
 		e.appendChild(idElem);
-		idElem.appendChild(doc.createTextNode(getId()));
+    idElem.setAttribute(interanIdAttrName, getId());
+		idElem.appendChild(doc.createTextNode(name));
 
 		Element nameElem = doc.createElement("name");
 		e.appendChild(nameElem);
