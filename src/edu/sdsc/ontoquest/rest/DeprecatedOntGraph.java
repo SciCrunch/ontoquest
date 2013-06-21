@@ -18,7 +18,7 @@ import edu.sdsc.ontoquest.db.functions.GetNeighbors;
 /**
  * @deprecated
  * Replaced by OntGraph class
- * $Id: DeprecatedOntGraph.java,v 1.2 2012-04-30 22:44:13 xqian Exp $
+ * $Id: DeprecatedOntGraph.java,v 1.3 2013-06-21 22:28:27 jic002 Exp $
  *
  */
 @Deprecated
@@ -105,7 +105,7 @@ public class DeprecatedOntGraph extends BaseBean {
 
 			Relationship e = new Relationship(rs.getInt(1), rs.getInt(2), rs
 					.getString(3), rs.getInt(4), rs.getInt(5), rs.getString(6), rs
-					.getInt(7), rs.getString(8));
+					.getInt(7), rs.getString(8), context);
 			if (!edgeSet.contains(e)) {
 				edgeSet.add(e);
 			}

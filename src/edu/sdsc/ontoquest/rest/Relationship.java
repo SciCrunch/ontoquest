@@ -1,10 +1,14 @@
 package edu.sdsc.ontoquest.rest;
 
+import edu.sdsc.ontoquest.Context;
+
+import edu.sdsc.ontoquest.OntoquestException;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 /**
- * @version $Id: Relationship.java,v 1.1 2010-10-28 06:29:57 xqian Exp $
+ * @version $Id: Relationship.java,v 1.2 2013-06-21 22:28:29 jic002 Exp $
  *
  */
 public class Relationship extends BaseBean {
@@ -16,10 +20,11 @@ public class Relationship extends BaseBean {
   private String label2;
   private int pid; // property id, a.k.a. edge label id
   private String pname; // property name, a.k.a. edge label
+  private Context context;
   
   private static final int DEFAULT_PROPERTY_RTID = 15;
   
-  public Relationship(int rid1, int rtid1, String label1, int rid2, int rtid2, String label2, int pid, String pname) {
+  public Relationship(int rid1, int rtid1, String label1, int rid2, int rtid2, String label2, int pid, String pname, Context context) {
     this.rid1 = rid1;
     this.rtid1 = rtid1;
     this.label1 = label1;
@@ -28,6 +33,7 @@ public class Relationship extends BaseBean {
     this.label2 = label2;
     this.pid = pid;
     this.pname = pname;
+    this.context = context;
   }
 
   /**
@@ -105,7 +111,13 @@ public class Relationship extends BaseBean {
     Element e = doc.createElement("relationship");
     
     Element subElem = doc.createElement("subject");
-    subElem.setAttribute("id", ClassNode.generateId(getRid1(), getRtid1()));
+    subElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getRid1(), getRtid1()));
+    try
+    {
+      subElem.setAttribute("id", ClassNode.generateExtId(getRid1(), getRtid1(), context));
+    } catch (OntoquestException f)
+    {
+    }
     subElem.appendChild(doc.createTextNode(getLabel1()));
     e.appendChild(subElem);
     

@@ -19,7 +19,7 @@ import edu.sdsc.ontoquest.db.functions.GetNeighbors.PropertyType;
 import edu.sdsc.ontoquest.query.Utility;
 
 /**
- * @version $Id: SimpleClassNode.java,v 1.2 2012-04-30 22:44:13 xqian Exp $
+ * @version $Id: SimpleClassNode.java,v 1.3 2013-06-21 22:28:30 jic002 Exp $
  *
  */
 public class SimpleClassNode extends BasicClassNode {
@@ -170,7 +170,9 @@ public class SimpleClassNode extends BasicClassNode {
 
 		Element idElem = doc.createElement("id");
 		e.appendChild(idElem);
-		idElem.appendChild(doc.createTextNode(ClassNode.generateId(getRid(), getRtid())));
+    idElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getRid(), getRtid()));
+    String n = getName();
+		idElem.appendChild(doc.createTextNode(n));
 
 		if (!Utility.isBlank(getName())) {
 			Element nameElem = doc.createElement("name");

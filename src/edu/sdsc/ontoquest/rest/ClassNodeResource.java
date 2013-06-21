@@ -21,7 +21,7 @@ import edu.sdsc.ontoquest.rest.BaseBean.NeighborType;
 import edu.sdsc.ontoquest.rest.BaseBean.SiblingsType;
 
 /**
- * @version $Id: ClassNodeResource.java,v 1.2 2012-04-30 22:44:12 xqian Exp $
+ * @version $Id: ClassNodeResource.java,v 1.3 2013-06-21 22:28:27 jic002 Exp $
  *
  */
 public class ClassNodeResource extends BaseResource {
@@ -85,9 +85,11 @@ public class ClassNodeResource extends BaseResource {
 			if (n == null) {
 				continue; // TODO: throw exception?
 			}
+      
 			n.getSuperclasses().add(
-					new SimpleClassNode(edge.getRid2(), edge.getRtid2(), null, edge
-							.getLabel2(), null));
+					new SimpleClassNode(edge.getRid2(), edge.getRtid2(),
+                   ClassNode.generateExtId(edge.getRid2(),edge.getRtid2(), getOntoquestContext()),
+                  edge.getLabel2(), null));
 		}
 	}
 

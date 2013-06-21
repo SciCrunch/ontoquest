@@ -17,7 +17,7 @@ import edu.sdsc.ontoquest.db.functions.RunSQL;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: Ontology.java,v 1.1 2010-10-28 06:29:53 xqian Exp $
+ * @version $Id: Ontology.java,v 1.2 2013-06-21 22:28:27 jic002 Exp $
  *
  */
 public class Ontology extends BaseBean {
@@ -32,11 +32,13 @@ public class Ontology extends BaseBean {
   String format = "OWL";
   List<String> contributors = new LinkedList<String>();
   String dateCreated = "";
+  Context context;
   
-  public Ontology(int rid, int rtid, String name) {
+  public Ontology(int rid, int rtid, String name, Context context) {
     this.rid = rid;
     this.rtid = rtid;
     this.name = name;
+    this.context = context;
   }
   
   public static Ontology get(String kbName, Context context) throws OntoquestException {
@@ -88,7 +90,7 @@ public class Ontology extends BaseBean {
     OntoquestFunction<ResourceSet> f = new GetNeighbors(rid, rtid, 0, 
         null, null, GetNeighbors.EDGE_OUTGOING, true, false, 0, true);
     
-    Ontology ont = new Ontology(rid, rtid, kbName);
+    Ontology ont = new Ontology(rid, rtid, kbName, context);
     
     ResourceSet rs = f.execute(context, getVarList8());
     while (rs.next()) {
@@ -136,12 +138,20 @@ public class Ontology extends BaseBean {
    * @see edu.sdsc.ontoquest.rest.BaseBean#toXml(org.w3c.dom.Document)
    */
   @Override
-  public Element toXml(Document doc) {
+  public Element toXml(Document doc) 
+  {
     Element e = doc.createElement("ontologyBean");
     
     Element idElem = doc.createElement("id");
     e.appendChild(idElem);
-    idElem.appendChild(doc.createTextNode(ClassNode.generateId(rid, rtid)));
+    idElem.setAttribute("InternalId", ClassNode.generateId(rid, rtid));
+
+    try
+    {
+      idElem.appendChild(doc.createTextNode(ClassNode.generateExtId(rid, rtid, context)));
+    } catch (OntoquestException f)
+    {
+    }
     
     Element nameElem = doc.createElement("displayLabel");
     e.appendChild(nameElem);
