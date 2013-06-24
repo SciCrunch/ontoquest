@@ -8,7 +8,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 /**
- * @version $Id: Relationship.java,v 1.2 2013-06-21 22:28:29 jic002 Exp $
+ * @version $Id: Relationship.java,v 1.3 2013-06-24 16:59:40 jic002 Exp $
  *
  */
 public class Relationship extends BaseBean {
@@ -122,12 +122,24 @@ public class Relationship extends BaseBean {
     e.appendChild(subElem);
     
     Element propElem = doc.createElement("property");
-    propElem.setAttribute("id", ClassNode.generateId(getPid(), DEFAULT_PROPERTY_RTID));
+    propElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getPid(), DEFAULT_PROPERTY_RTID));
+    try
+    {
+      propElem.setAttribute("id", ClassNode.generateExtId(getPid(), DEFAULT_PROPERTY_RTID,context));
+    } catch (OntoquestException f)
+    {
+    }
     propElem.appendChild(doc.createTextNode(getPname()));
     e.appendChild(propElem);
 
     Element objElem = doc.createElement("object");
-    objElem.setAttribute("id", ClassNode.generateId(getRid2(), getRtid2()));
+    objElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getRid2(), getRtid2()));
+    try
+    {
+      objElem.setAttribute("id", ClassNode.generateExtId(getRid2(), getRtid2(),context));
+    } catch (OntoquestException f)
+    {
+    }
     objElem.appendChild(doc.createTextNode(getLabel2()));
     e.appendChild(objElem);
 
