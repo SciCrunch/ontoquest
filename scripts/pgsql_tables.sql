@@ -136,6 +136,8 @@ select drop_if_exists('namespace');
 
 select drop_if_exists('kb');
 
+select drop_if_exists('disjointunionclass');
+
 -- **************************
 -- SEQUENCES
 -- **************************
@@ -728,6 +730,19 @@ CREATE TABLE disjointclass (
 CREATE INDEX disjoint_idx1 ON disjointclass (rtid1, classid1);
 
 CREATE INDEX disjoint_idx2 ON disjointclass (rtid2, classid2);
+
+-- owl:disjointunion
+create table disjointunionclass (
+  pclassid integer NOT NULL,
+  prtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
+  cclassid integer NOT NULL,
+  crtid integer NOT NULL REFERENCES resourcetype (id) ON DELETE CASCADE,
+  kbid  integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
+);
+
+CREATE INDEX disjointunion_idx1 ON disjointunionclass (pclassid, prtid);
+
+CREATE INDEX disjointunion_idx2 ON disjointunionclass (cclassid, crtid);
 
 -- rdfs:subClassOf
 -- If DAG indexing mechanism is used to compute inference 
