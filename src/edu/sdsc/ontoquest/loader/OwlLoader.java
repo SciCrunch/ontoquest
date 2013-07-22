@@ -123,6 +123,10 @@ import edu.sdsc.ontoquest.loader.struct.OntNode.NodeType;
 import edu.sdsc.ontoquest.loader.struct.OntologyEntity;
 import edu.sdsc.ontoquest.query.Utility;
 
+import org.semanticweb.owlapi.io.UnparsableOntologyException;
+import org.semanticweb.owlapi.model.OWLDisjointUnionAxiom;
+import org.semanticweb.owlapi.model.OWLOntologyCreationException;
+
 public class OwlLoader {
 	private static class Options {
 		@Option(name = "-c", usage = "configuration file (default: config/ontoquest.xml)")
@@ -802,6 +806,7 @@ public class OwlLoader {
 			processNaryIndividualAxioms(ont);
 			processAnnotationAssertionAxioms(ont);
 			processDeclarationAxioms(ont);
+		  processDisjointUnionAxioms(ont);
 			processUnimplementedAxioms(ont);
 		}
 	}
@@ -834,6 +839,7 @@ public class OwlLoader {
 
 	}
 
+  
 	private void processDeclarationAxioms(OWLOntology ontology)
 			throws UnsupportedEncodingException, OntoquestException {
 		String ontologyId = getOntologyId(ontology);
@@ -879,6 +885,53 @@ public class OwlLoader {
 		}
 
 	}
+
+
+  private void processDisjointUnionAxioms(OWLOntology ontology)    throws OntoquestException, UnsupportedEncodingException {
+    String ontologyId = getOntologyId(ontology);
+    Set<OWLDisjointUnionAxiom> axioms = ontology.getAxioms(AxiomType.DISJOINT_UNION);
+    for (OWLDisjointUnionAxiom axiom : axioms) {
+        OntNode unionNode = findNode(axiom.getOWLClass(), ontologyId);
+        if (unionNode == null)
+          throw new OntoquestException(
+              "Couldn't find DisjointUnion axiom's OWLClass in database: "
+                  + axiom.getOWLClass().toString());
+
+        // find each class
+        for ( OWLClassExpression oce : axiom.getClassExpressions()) 
+        {
+          OntNode mNode = findNode ( oce, ontologyId);
+          if (mNode == null)
+            throw new OntoquestException(
+                "Couldn't find DisjointUnion axiom's disjoint class in database: "
+                    + oce.toString());
+          PrintWriter writer = tmpDataManager.getWriter(TmpFileType.DisjointUnionClass);
+          // line: childid, child_rtid, parentid, parent_rtid, inferred, kbid
+          printLine(writer, unionNode.getRid(), unionNode.getType().getRtid(),
+              mNode.getRid(), mNode.getType().getRtid(), kbid);
+          
+        }
+    }
+
+    Set<OWLEquivalentDataPropertiesAxiom> axioms2 = ontology
+        .getAxioms(AxiomType.EQUIVALENT_DATA_PROPERTIES);
+    for (OWLEquivalentDataPropertiesAxiom axiom : axioms2) {
+      Set<OWLDataPropertyExpression> properties = axiom.getProperties();
+      if (properties == null || properties.size() != 2)
+        throw new OntoquestException(
+            "Incorrect number of properties in equivalent object property "
+                + axiom);
+
+      Iterator<OWLDataPropertyExpression> it = properties.iterator();
+      OWLDataPropertyExpression p1 = it.next();
+      OWLDataPropertyExpression p2 = it.next();
+      saveEquivalentPropertyOfAxiom(p1, p2, ontologyId);
+    }
+
+  }
+
+
+
 
 	private void processInversePropertyOfAxioms(OWLOntology ontology)
 			throws OntoquestException, UnsupportedEncodingException {
@@ -1100,10 +1153,10 @@ public class OwlLoader {
 			throw new OntoquestException("Not implemented! "
 					+ AxiomType.DATATYPE_DEFINITION);
 		}
-		if (ontology.getAxioms(AxiomType.DISJOINT_UNION).size() > 0) {
+/*		if (ontology.getAxioms(AxiomType.DISJOINT_UNION).size() > 0) {
 			throw new OntoquestException("Not implemented! "
 					+ AxiomType.DISJOINT_UNION);
-		}
+		} */
 		if (ontology.getAxioms(AxiomType.HAS_KEY).size() > 0) {
 			throw new OntoquestException("Not implemented! " + AxiomType.HAS_KEY);
 		}
@@ -1132,8 +1185,18 @@ public class OwlLoader {
 		// save ontologies.
 		manager = OWLManager.createOWLOntologyManager();
 		IRI inputOntologyIRI = IRI.create(ontologyFilePath);
-		OWLOntology ontology = manager
-				.loadOntologyFromOntologyDocument(inputOntologyIRI);
+	  OWLOntology ontology =null;
+    try { 
+              // Very important otherwise RDFXMLParser
+              // fails with SAXParseException: The parser has encountered more
+              // / than "64,000" entity expansions
+      System.setProperty("entityExpansionLimit", "10000000");
+      ontology = manager.loadOntologyFromOntologyDocument(inputOntologyIRI);
+    } catch (UnparsableOntologyException ue ) 
+    {
+       System.out.println (ue.getMessage());
+       return;
+    }
 		// // Now, we create the file from which the ontology will be loaded.
 		// // Here the ontology is stored in a file locally in the ontologies
 		// // subfolder of the examples folder.
@@ -1195,6 +1258,7 @@ public class OwlLoader {
 					+ " has been saved. Total time (sec): " + (time2 - time1) / 1000);
 
 		} catch (Exception e) {
+      this.log.warn("Eror: "+ e.getMessage());
 			try {
 				con.rollback();
 				// cleanKB(con);
@@ -2167,6 +2231,10 @@ public class OwlLoader {
 					+ counter.increment()
 					+ ",'value',null,false,false,false,false,false,false,false,false,true,false,"
 					+ rdfNSID + "," + kbid + ",'rdf:value',false)");
+		  stmt.addBatch("insert into property values("
+		      + counter.increment()
+		      + ",'disjointUnion',null,false,false,false,false,false,false,false,false,true,false,"
+		      + owlNSID + "," + kbid + ",'owl:disjointUnion',false)");
 			// stmt.addBatch("insert into property values("
 			// + counter.increment()
 			// +
@@ -2209,7 +2277,7 @@ public class OwlLoader {
 				TmpFileType.DifferentIndividual, TmpFileType.SameIndividual,
 				TmpFileType.Domain, TmpFileType.Range, TmpFileType.Relationship,
 				TmpFileType.SubclassOf, TmpFileType.SubpropertyOf,
-				TmpFileType.InversePropertyOf, TmpFileType.TypeOf
+				TmpFileType.InversePropertyOf, TmpFileType.TypeOf,TmpFileType.DisjointUnionClass
 		};
 
 		for (TmpFileType type : types) {
