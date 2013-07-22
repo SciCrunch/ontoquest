@@ -25,7 +25,13 @@ public class TmpDataManager {
 	// };
 
 	public enum TmpFileType {
-		AllDifferentIndividual, AllValuesFrom, CardinialityClass, ComplementClass, Datarange, Datatype, DatatypeRestriction, DifferentIndividual, DisjointClass, Domain, EquivalentClass, EquivalentProperty, HasSelf, HasValue, Individual, IntersectionClass, InversePropertyOf, Literal, MaxCardinalityClass, MinCardinalityClass, NamedClass, OneOf, Property, Range, Relationship, SameIndividual, SomeValuesFrom, SubpropertyOf, SubclassOf, TypeOf, UnionClass
+		AllDifferentIndividual, AllValuesFrom, CardinialityClass, ComplementClass, 
+      Datarange, Datatype, DatatypeRestriction, DifferentIndividual, 
+      DisjointClass, Domain, EquivalentClass, EquivalentProperty, HasSelf, 
+      HasValue, Individual, IntersectionClass, InversePropertyOf, Literal, 
+      MaxCardinalityClass, MinCardinalityClass, NamedClass, OneOf, Property, Range, 
+      Relationship, SameIndividual, SomeValuesFrom, SubpropertyOf, SubclassOf, 
+      TypeOf, UnionClass,DisjointUnionClass
 	}
 
 	private Environment dbEnv = null;
@@ -120,6 +126,7 @@ public class TmpDataManager {
 		bulkLoadStmt.put(TmpFileType.SubpropertyOf, "subpropertyof");
 		bulkLoadStmt.put(TmpFileType.TypeOf, "typeof");
 		bulkLoadStmt.put(TmpFileType.UnionClass, "unionclass");
+	  bulkLoadStmt.put(TmpFileType.DisjointUnionClass, "disjointunionclass");
 
 	}
 
