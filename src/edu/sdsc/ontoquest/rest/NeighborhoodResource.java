@@ -17,8 +17,10 @@ import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.rest.BaseBean.InputType;
 import edu.sdsc.ontoquest.rest.BaseBean.NeighborType;
 
+import java.util.Calendar;
+
 /**
- * @version $Id: NeighborhoodResource.java,v 1.1 2010-10-28 06:29:58 xqian Exp $
+ * @version $Id: NeighborhoodResource.java,v 1.2 2013-08-02 21:43:44 jic002 Exp $
  *
  */
 public class NeighborhoodResource extends BaseResource {
@@ -64,8 +66,18 @@ public class NeighborhoodResource extends BaseResource {
       if (attributes.get("level") == null) {
         attributes.put("level", 1); // default level = 1
       }
-      graph = OntGraph.get(inputStr, type, application.getKbId(), 
+      long t1 = Calendar.getInstance().getTimeInMillis();
+      if ( type == NeighborType.EDGE) 
+      {
+        graph =  OntGraph.getAllEdges(inputStr, application.getKbId(), 
+            inputType, getOntoquestContext());
+      } else {
+        graph = OntGraph.get(inputStr, type, application.getKbId(), 
             attributes, inputType, getOntoquestContext());
+      }
+      long t2 = Calendar.getInstance().getTimeInMillis();
+      
+      System.out.println ("Wall Clock time for runing OntGraph.get is: " + (t2-t1)+ " milliseconds." );
       
     } catch (IllegalArgumentException iae) {
 //      throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, 
