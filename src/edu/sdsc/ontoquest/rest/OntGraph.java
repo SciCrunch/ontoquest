@@ -13,10 +13,20 @@ import edu.sdsc.ontoquest.Context;
 import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.OntoquestFunction;
 import edu.sdsc.ontoquest.ResourceSet;
+import edu.sdsc.ontoquest.db.DbContext;
+import edu.sdsc.ontoquest.db.DbResourceSet;
+import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.db.functions.GetNeighbors;
+import edu.sdsc.ontoquest.query.Utility;
+import edu.sdsc.ontoquest.rest.BaseBean.InputType;
+import edu.sdsc.ontoquest.rest.BaseBean.NeighborType;
+
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.Statement;
 
 /**
- * @version $Id: OntGraph.java,v 1.3 2013-06-21 22:28:27 jic002 Exp $
+ * @version $Id: OntGraph.java,v 1.4 2013-08-02 21:45:41 jic002 Exp $
  *
  */
 public class OntGraph extends BaseBean {
@@ -135,6 +145,62 @@ public class OntGraph extends BaseBean {
 
 		return getRelatedClasses(f, nodeMap, new HashSet<Relationship>(), context);
 	}
+  /**
+   *
+   * @param inputStr  termID for the property to search for
+   * @param kbId     KnowledgeBase id to search in
+   * @param inputType  Specify if it is a termID, OID or name
+   * @param context   
+   * @return
+   * @throws OntoquestException
+   */
+
+  public static OntGraph getAllEdges(String inputStr, int kbId, InputType inputType, Context context ) throws OntoquestException {
+
+    HashSet<Relationship> result = new HashSet<Relationship>();
+    
+    Connection conn = null;
+    ResultSet rs = null;
+    String sql = "select e.rid1, e.rtid1, n1.label, e.rid2, e.rtid2, n2.label, pid, p.name from graph_edges_all e, property p, graph_nodes_all n1, graph_nodes_all n2 " + 
+           " where e.kbid =" + kbId + " and p.id = e.pid and p.name = '" +
+                 inputStr + "' and n1.rid = rid1 and n1.rtid = rtid1 " + 
+           " and n2.rid = rid2 and n2.rtid = rtid2";
+    try {
+      Utility.checkBlank(sql, OntoquestException.Type.EXECUTOR,
+          "Invalid statement: " + sql);
+      // System.out.println(sql);
+      conn = DbUtility.getDBConnection(context);
+      Statement stmt = conn.createStatement();
+      rs = stmt.executeQuery(sql);
+      while ( rs.next() ) 
+      {
+        Relationship e = new Relationship(rs.getInt(1), rs.getInt(2),
+            rs.getString(3), rs.getInt(4), rs.getInt(5), rs.getString(6),
+            rs.getInt(7), rs.getString(8), context);
+        result.add(e); 
+      }
+      rs.close();
+      stmt.close();
+      DbUtility.releaseDbConnection(conn, context);
+      
+      return new OntGraph(result);
+    } catch (Exception e) {
+      try {
+        rs.close();
+      } catch (Exception e2) {
+      }
+      DbUtility.releaseDbConnection(conn, context);
+      if (!(e instanceof OntoquestException)) {
+        e.printStackTrace();
+        throw new OntoquestException(OntoquestException.Type.BACKEND,
+            "Error in getAllEdges function", e);
+      } else {
+        throw (OntoquestException) e; // throw ontoquest exception up
+      }
+    }
+
+  }
+
 
 	private static OntGraph getRelatedClasses(OntoquestFunction<ResourceSet> f,
 			HashMap<String, int[]> nodeMap, Set<Relationship> edgeSet, Context context)
