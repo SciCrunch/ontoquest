@@ -11,14 +11,14 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: BaseBean.java,v 1.4 2012-06-23 17:19:27 xqian Exp $
+ * @version $Id: BaseBean.java,v 1.5 2013-08-02 22:14:00 jic002 Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
  * 
  */
 public abstract class BaseBean {
 	public enum InputType { OID, NAME, TERM }
-	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL }
+	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL,EDGE }
 
 	public enum SiblingsType { CLASSES, PARTS }
 
