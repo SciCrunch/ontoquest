@@ -20,7 +20,7 @@ import edu.sdsc.ontoquest.rest.BaseBean.NeighborType;
 import java.util.Calendar;
 
 /**
- * @version $Id: NeighborhoodResource.java,v 1.2 2013-08-02 21:43:44 jic002 Exp $
+ * @version $Id: NeighborhoodResource.java,v 1.3 2013-08-03 05:35:39 jic002 Exp $
  *
  */
 public class NeighborhoodResource extends BaseResource {
@@ -42,7 +42,7 @@ public class NeighborhoodResource extends BaseResource {
       typeVal = (String) getRequest().getAttributes().get("type");
       this.type = null;
       try {
-        type = NeighborType.valueOf(typeVal.toUpperCase());
+        type = NeighborType.valueOf(typeVal.toUpperCase().replace('-', '_'));
       } catch (IllegalArgumentException iae) {
         throw new OntoquestException(OntoquestException.Type.INPUT, "Invalid neighbor type: " + typeVal);
       }
@@ -57,7 +57,13 @@ public class NeighborhoodResource extends BaseResource {
           inputType = InputType.NAME;
         } else {
           inputStr = (String)getRequest().getAttributes().get("term");
-          inputType = InputType.TERM;
+          if ( inputStr !=null) {
+            inputType = InputType.TERM;
+          } else 
+          {
+            inputStr = (String)getRequest().getAttributes().get("id");
+            inputType =InputType.ID;
+          }
         }
       }
       
@@ -67,7 +73,7 @@ public class NeighborhoodResource extends BaseResource {
         attributes.put("level", 1); // default level = 1
       }
       long t1 = Calendar.getInstance().getTimeInMillis();
-      if ( type == NeighborType.EDGE) 
+      if ( type == NeighborType.EDGE_RELATION) 
       {
         graph =  OntGraph.getAllEdges(inputStr, application.getKbId(), 
             inputType, getOntoquestContext());
