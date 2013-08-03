@@ -26,7 +26,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 /**
- * @version $Id: OntGraph.java,v 1.4 2013-08-02 21:45:41 jic002 Exp $
+ * @version $Id: OntGraph.java,v 1.5 2013-08-03 05:33:40 jic002 Exp $
  *
  */
 public class OntGraph extends BaseBean {
@@ -161,10 +161,18 @@ public class OntGraph extends BaseBean {
     
     Connection conn = null;
     ResultSet rs = null;
-    String sql = "select e.rid1, e.rtid1, n1.label, e.rid2, e.rtid2, n2.label, pid, p.name from graph_edges_all e, property p, graph_nodes_all n1, graph_nodes_all n2 " + 
+    
+    String sql ;
+    if ( inputType == InputType.ID) {
+       sql = "select e.rid1, e.rtid1, n1.label, e.rid2, e.rtid2, n2.label, pid, p.name from graph_edges_all e, property p, graph_nodes_all n1, graph_nodes_all n2 " + 
            " where e.kbid =" + kbId + " and p.id = e.pid and p.name = '" +
                  inputStr + "' and n1.rid = rid1 and n1.rtid = rtid1 " + 
            " and n2.rid = rid2 and n2.rtid = rtid2";
+    } else 
+    {
+      throw new OntoquestException ("Edge-relation search on term is not implemented yet.");
+    }
+    
     try {
       Utility.checkBlank(sql, OntoquestException.Type.EXECUTOR,
           "Invalid statement: " + sql);
