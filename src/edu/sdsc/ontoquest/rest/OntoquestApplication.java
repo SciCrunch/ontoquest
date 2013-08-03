@@ -17,7 +17,7 @@ import edu.sdsc.ontoquest.db.DbConnectionPool;
 import edu.sdsc.ontoquest.db.DbContext;
 
 /**
- * @version $Id: OntoquestApplication.java,v 1.2 2011-07-13 12:15:40 xqian Exp $
+ * @version $Id: OntoquestApplication.java,v 1.3 2013-08-03 05:32:22 jic002 Exp $
  *
  */
 public class OntoquestApplication extends Application {
@@ -68,6 +68,7 @@ public class OntoquestApplication extends Application {
 		router.attach("/rel/{type}/{classId}", NeighborhoodResource.class);
 		router.attach("/rel/{type}/oid/{oid}", NeighborhoodResource.class);
 		router.attach("/rel/{type}/term/{term}", NeighborhoodResource.class);
+	  router.attach("/rel/{type}/id/{id}", NeighborhoodResource.class);
 
 		// Deprecated services. For back compatibility only. Defines a route for related concepts
 		router.attach("/graph/{type}/{classId}", DeprecatedNeighborhoodResource.class);
