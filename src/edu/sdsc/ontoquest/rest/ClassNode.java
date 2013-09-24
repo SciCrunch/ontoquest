@@ -25,7 +25,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 /**
- * @version $Id: ClassNode.java,v 1.4 2013-06-21 22:23:29 jic002 Exp $
+ * @version $Id: ClassNode.java,v 1.5 2013-09-24 23:15:40 jic002 Exp $
  *
  */
 public class ClassNode extends BaseBean {
@@ -67,6 +67,7 @@ public class ClassNode extends BaseBean {
       try {
         rs.close();
       } catch (Exception e2) {
+        throw new OntoquestException ("Fail to close result set of DB query.");
       }
       DbUtility.releaseDbConnection(conn, context);
       if (!(e instanceof OntoquestException)) {
