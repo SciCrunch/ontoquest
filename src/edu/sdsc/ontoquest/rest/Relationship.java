@@ -8,7 +8,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 /**
- * @version $Id: Relationship.java,v 1.3 2013-06-24 16:59:40 jic002 Exp $
+ * @version $Id: Relationship.java,v 1.4 2013-09-24 23:12:16 jic002 Exp $
  *
  */
 public class Relationship extends BaseBean {
@@ -117,9 +117,13 @@ public class Relationship extends BaseBean {
       subElem.setAttribute("id", ClassNode.generateExtId(getRid1(), getRtid1(), context));
     } catch (OntoquestException f)
     {
+       System.out.println("Exception from Relationship.toXML()" + f.getMessage());
     }
-    subElem.appendChild(doc.createTextNode(getLabel1()));
-    e.appendChild(subElem);
+    if ( getLabel1() != null ) {
+      subElem.appendChild(doc.createTextNode(getLabel1()));
+      e.appendChild(subElem);
+    } else 
+      System.out.println("ERROR: getLabel1 returns null");
     
     Element propElem = doc.createElement("property");
     propElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getPid(), DEFAULT_PROPERTY_RTID));
@@ -128,10 +132,16 @@ public class Relationship extends BaseBean {
       propElem.setAttribute("id", ClassNode.generateExtId(getPid(), DEFAULT_PROPERTY_RTID,context));
     } catch (OntoquestException f)
     {
+      System.out.println("Exception from Relationship.toXML()" + f.getMessage());
     }
-    propElem.appendChild(doc.createTextNode(getPname()));
-    e.appendChild(propElem);
-
+    
+    if ( getPname() != null ) {
+      propElem.appendChild(doc.createTextNode(getPname()));
+      e.appendChild(propElem);
+    } 
+    else 
+    System.out.println("ERROR: getPname returns null");
+    
     Element objElem = doc.createElement("object");
     objElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getRid2(), getRtid2()));
     try
@@ -139,9 +149,13 @@ public class Relationship extends BaseBean {
       objElem.setAttribute("id", ClassNode.generateExtId(getRid2(), getRtid2(),context));
     } catch (OntoquestException f)
     {
+      System.out.println("Exception from Relationship.toXML()" + f.getMessage());
     }
-    objElem.appendChild(doc.createTextNode(getLabel2()));
-    e.appendChild(objElem);
+    if ( getLabel2() != null) {
+      objElem.appendChild(doc.createTextNode(getLabel2()));
+      e.appendChild(objElem);
+    } else 
+      System.out.println("ERROR: getLabel2 returns null for "+ rid2 + ',' + rtid2);
 
     return e;
   }
