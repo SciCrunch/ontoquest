@@ -13,11 +13,22 @@ import edu.sdsc.ontoquest.BasicFunctions;
 import edu.sdsc.ontoquest.Context;
 import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.ResourceSet;
+import edu.sdsc.ontoquest.graph.GraphEdge;
+import edu.sdsc.ontoquest.graph.GraphNode;
 import edu.sdsc.ontoquest.query.Utility;
 import edu.sdsc.ontoquest.query.Variable;
 
+import edu.sdsc.ontoquest.rest.BaseBean;
+
+import java.net.URISyntaxException;
+
+import java.sql.SQLException;
+
+//import org.jgrapht.DirectedGraph;
+//import org.jgrapht.graph.DefaultDirectedGraph;
+
 /**
- * @version $Id: DbBasicFunctions.java,v 1.2 2012-04-30 22:43:04 xqian Exp $
+ * @version $Id: DbBasicFunctions.java,v 1.3 2013-09-24 23:07:38 jic002 Exp $
  *
  */
 public class DbBasicFunctions implements BasicFunctions {
@@ -537,4 +548,102 @@ public class DbBasicFunctions implements BasicFunctions {
     sb.append(']');
     return sb.toString();
   }
+
+  public ResourceSet searchSubclasses ( int kbid, String term_id, Context context) throws OntoquestException
+  {
+    String sql = "select * from get_incoming_enclosure_by_term_id('"+term_id+"','subClassOf',"+kbid+")";
+    String errmsg = "";
+    return DbUtility.executeSQLQuery( sql, context, BaseBean.getVarList8(), null, errmsg);
+  }
+
+  public ResourceSet searchpartOf ( int kbid, String term_id, Context context) throws OntoquestException
+  {
+    String sql = "select * from get_outgoing_enclosure_by_term_id('"+term_id+"','part_of',"+kbid+")";
+    String errmsg = "";
+    return DbUtility.executeSQLQuery( sql, context, BaseBean.getVarList8(), null, errmsg);
+  }
+
+  /*
+  public void  addDesendantsToGraph(int kbid, int rid, int rtid, int propId,
+                                                                  Context context,
+                                                                  DirectedGraph<GraphNode, GraphEdge> g) throws SQLException,
+                                                                                           OntoquestException,
+                                                                                           URISyntaxException
+  {
+  //  DirectedGraph<GraphNode, GraphEdge> g = new DefaultDirectedGraph<GraphNode, GraphEdge>(GraphEdge.class);
+    
+    GraphNode n = new GraphNode( rid, rtid, kbid, context);
+    g.addVertex(n);
+  
+    String stmt = "select e.rid2, e.rtid2, n.name, n.label, n.uri, p.name, e.pid, case when position(':' in p.browsertext) >=1 then " + 
+                   "(ns.url || substring(p.browsertext,length(ns.prefix)+1)) else (ns.url ||p.browsertext) end as puri " +
+                   "from graph_edges e, property p, graph_nodes n, namespace ns where e.pid = p.id  and p.kbid = e.kbid " +
+                  "and ns.id = p.nsid and n.kbid = e.kbid and e.rid2=n.rid and e.rtid2=n.rtid and rid1 = " + rid + 
+                  " and rtid1 = " + rtid + " and e.kbid = " + kbid + " and e.pid in ( 6435,7137, 6307,7602,7044," + propId + ")";
+
+    Connection conn = DbUtility.getDBConnection(context);
+
+  //  boolean found = false;
+    ResultSet r = DbUtility.runSqlQuery(stmt, conn);
+    while (r.next()) 
+    {
+       GraphNode n2 = new GraphNode( r.getString(3), r.getString(4), r.getString(5), r.getInt(1), r.getInt(2), kbid);
+       g.addVertex(n2);
+       GraphEdge e = new GraphEdge(r.getInt(7), r.getString(6),r.getString(7), kbid);
+       boolean result = g.addEdge(n, n2, e);
+       System.out.println (result);
+       addDesendantsToGraph(kbid, n2.getRid(), n2.getRTid(), propId, context, g);
+    }
+    DbUtility.releaseDbConnection(conn, context);
+    //return g;
+  }   
+//    DbUtility.releaseDbConnection(conn, context);
+  
+  
+    public void  addAscendantsToGraph(int kbid, int rid, int rtid, int[] propIds,
+                                                                  Context context,
+                                                                  DirectedGraph<GraphNode, GraphEdge> g) throws SQLException,
+                                                                                           OntoquestException,
+                                                                                           URISyntaxException
+  {
+  //  DirectedGraph<GraphNode, GraphEdge> g = new DefaultDirectedGraph<GraphNode, GraphEdge>(GraphEdge.class);
+    
+    String idstr = "";
+    
+    for ( int i =0 ; i < propIds.length; i++ ) 
+    {
+      idstr += Integer.toString(propIds[i]);
+      if (i <propIds.length-1) 
+        idstr += ',';
+    }
+    
+    GraphNode n = new GraphNode( rid, rtid, kbid, context);
+    g.addVertex(n);
+  
+    String stmt = "select e.rid1, e.rtid1, n.name, n.label, n.uri, p.name, e.pid, case when position(':' in p.browsertext) >=1 then " + 
+                   "(ns.url || substring(p.browsertext,length(ns.prefix)+1)) else (ns.url ||p.browsertext) end as puri " +
+                   "from graph_edges e, property p, graph_nodes n, namespace ns where e.pid = p.id  and p.kbid = e.kbid " +
+                  "and ns.id = p.nsid and n.kbid = e.kbid and e.rid1=n.rid and e.rtid1=n.rtid and rid2 = " + rid + 
+                  " and rtid2 = " + rtid + " and e.kbid = " + kbid + " and e.pid in ( 6435,7137, 6307,7602,7044," + idstr + ")";
+
+    Connection conn = DbUtility.getDBConnection(context);
+
+  //  boolean found = false;
+    ResultSet r = DbUtility.runSqlQuery(stmt, conn);
+    while (r.next()) 
+    {
+       GraphNode n1 = new GraphNode( r.getString(3), r.getString(4), r.getString(5), r.getInt(1), r.getInt(2), kbid);
+       g.addVertex(n1);
+       GraphEdge e = new GraphEdge(r.getInt(7), r.getString(6),r.getString(8), kbid);
+       boolean result = g.addEdge(n1, n, e);
+       if (r.getInt(7) != 6313)
+         System.out.println (r.getInt(7));
+       addAscendantsToGraph(kbid, n1.getRid(), n1.getRTid(), propIds, context, g);
+    }
+    DbUtility.releaseDbConnection(conn, context);
+    //return g;
+  }   
+//    DbUtility.releaseDbConnection(conn, context);
+  
+  */
 }
