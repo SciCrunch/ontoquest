@@ -26,7 +26,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 /**
- * @version $Id: OntGraph.java,v 1.5 2013-08-03 05:33:40 jic002 Exp $
+ * @version $Id: OntGraph.java,v 1.6 2013-09-24 23:11:06 jic002 Exp $
  *
  */
 public class OntGraph extends BaseBean {
@@ -60,7 +60,7 @@ public class OntGraph extends BaseBean {
 		String[] includedProperties = null;
 		String[] excludedProperties = defaultExcludedProperties;
 
-		if (type == NeighborType.SUBCLASSES) {
+		if (type == NeighborType.SUBCLASSES ) {
 			edgeType = GetNeighbors.EDGE_INCOMING;
 			includedProperties = new String[] { "subClassOf" };
 		} else if (type == NeighborType.SUPERCLASSES) {
@@ -182,6 +182,12 @@ public class OntGraph extends BaseBean {
       rs = stmt.executeQuery(sql);
       while ( rs.next() ) 
       {
+        String label1 = rs.getString(3);
+        if ( label1 == null)
+          throw new OntoquestException("label for " + rs.getInt(1) + "-" + rs.getInt(2) + "not found in graph_nodes_all for " + kbId) ;
+        String label2 = rs.getString(6);
+        if ( label2 == null)
+          throw new OntoquestException("label for " + rs.getInt(4) + "-" + rs.getInt(5) + "not found in graph_nodes_all for " + kbId) ;
         Relationship e = new Relationship(rs.getInt(1), rs.getInt(2),
             rs.getString(3), rs.getInt(4), rs.getInt(5), rs.getString(6),
             rs.getInt(7), rs.getString(8), context);
@@ -226,6 +232,12 @@ public class OntGraph extends BaseBean {
 			// if (!nodeMap.containsKey(idStr2)) {
 			// nodeMap.put(idStr2, id2);
 			// }
+			String label1 = rs.getString(3);
+			if ( label1 == null)
+			  throw new OntoquestException("label for " + rs.getInt(1) + "-" + rs.getInt(2) + " not found in graph_nodes_all") ;
+			String label2 = rs.getString(6);
+			if ( label2 == null)
+			  throw new OntoquestException("label for " + rs.getInt(4) + "-" + rs.getInt(5) + " not found in graph_nodes_all") ;
 
 			Relationship e = new Relationship(rs.getInt(1), rs.getInt(2),
 					rs.getString(3), rs.getInt(4), rs.getInt(5), rs.getString(6),
@@ -278,7 +290,11 @@ public class OntGraph extends BaseBean {
 		Element edgesElem = doc.createElement("relationships");
 		e.appendChild(edgesElem);
 		for (Relationship r : getEdges()) {
-			edgesElem.appendChild(r.toXml(doc));
+      Element p = r.toXml (doc);
+      if (p != null)
+			  edgesElem.appendChild(p);
+      else 
+        System.out.println ("null value for element found");
 		}
 
 		return e;
