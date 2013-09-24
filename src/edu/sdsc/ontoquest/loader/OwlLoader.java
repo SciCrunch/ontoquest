@@ -1190,7 +1190,7 @@ public class OwlLoader {
               // Very important otherwise RDFXMLParser
               // fails with SAXParseException: The parser has encountered more
               // / than "64,000" entity expansions
-      System.setProperty("entityExpansionLimit", "10000000");
+      System.setProperty("entityExpansionLimit", "50000000");
       ontology = manager.loadOntologyFromOntologyDocument(inputOntologyIRI);
     } catch (UnparsableOntologyException ue ) 
     {
