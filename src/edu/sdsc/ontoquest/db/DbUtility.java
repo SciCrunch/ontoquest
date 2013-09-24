@@ -28,7 +28,7 @@ import edu.sdsc.ontoquest.query.Utility;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: DbUtility.java,v 1.3 2013-01-08 23:34:54 xqian Exp $
+ * @version $Id: DbUtility.java,v 1.4 2013-09-24 23:08:50 jic002 Exp $
  * 
  */
 public class DbUtility {
@@ -96,9 +96,10 @@ public class DbUtility {
 		try {
 			Utility.checkBlank(sql, OntoquestException.Type.EXECUTOR,
 					"Invalid statement: " + sql);
-			for (int i = args.length - 1; i >= 0; i--) {
-				sql = sql.replace(":" + (i + 1), args[i]);
-			}
+      if ( args != null) 
+			  for (int i = args.length - 1; i >= 0; i--) {
+				  sql = sql.replace(":" + (i + 1), args[i]);
+			  }
 			if (logger.isDebugEnabled())
 				logger.debug(sql);
 			// System.out.println(sql);
@@ -281,7 +282,7 @@ public class DbUtility {
 		}
 	}
 
-	protected static ResultSet runSqlQuery(String stmtStr, Connection con) throws SQLException {
+	public static ResultSet runSqlQuery(String stmtStr, Connection con) throws SQLException {
 		Statement stmt = null;
 		try {
 			stmt = con.createStatement();
