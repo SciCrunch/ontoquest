@@ -13,8 +13,8 @@ import edu.sdsc.ontoquest.BasicFunctions;
 import edu.sdsc.ontoquest.Context;
 import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.ResourceSet;
-import edu.sdsc.ontoquest.graph.GraphEdge;
-import edu.sdsc.ontoquest.graph.GraphNode;
+//import edu.sdsc.ontoquest.graph.GraphEdge;
+//import edu.sdsc.ontoquest.graph.GraphNode;
 import edu.sdsc.ontoquest.query.Utility;
 import edu.sdsc.ontoquest.query.Variable;
 
@@ -28,7 +28,7 @@ import java.sql.SQLException;
 //import org.jgrapht.graph.DefaultDirectedGraph;
 
 /**
- * @version $Id: DbBasicFunctions.java,v 1.3 2013-09-24 23:07:38 jic002 Exp $
+ * @version $Id: DbBasicFunctions.java,v 1.4 2013-09-25 17:34:09 jic002 Exp $
  *
  */
 public class DbBasicFunctions implements BasicFunctions {
