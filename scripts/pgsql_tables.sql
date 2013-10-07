@@ -37,6 +37,8 @@ language plpgsql;
 
 --commit;
 
+select drop_if_exists('equivalentclassgroup');
+
 select drop_if_exists('oneof_seq');
 
 select drop_if_exists('union_seq');
@@ -870,6 +872,24 @@ CREATE INDEX neg_data_prop_idx3 ON negative_data_prop (propertyid);
 
 CREATE INDEX neg_data_prop_idx4 ON negative_data_prop (kbid);
 
+
+CREATE TABLE equivalentclassgroup
+(
+  id serial ,
+  rid bigint,
+  ridm bigint,
+  kbid integer,
+  CONSTRAINT equivalentclassgroup_pkey PRIMARY KEY (id),
+  CONSTRAINT equivalentclassgroup_kbid_fkey FOREIGN KEY (kbid)
+      REFERENCES kb (id) MATCH SIMPLE
+      ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT equivalentclassgroup_rid_fkey FOREIGN KEY (rid)
+      REFERENCES primitiveclass (id) MATCH SIMPLE
+      ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT equivalentclassgroup_ridm_fkey FOREIGN KEY (ridm)
+      REFERENCES primitiveclass (id) MATCH SIMPLE
+      ON UPDATE NO ACTION ON DELETE NO ACTION
+);
 
 -- instance of a class
 -- If DAG indexing mechanism is used to compute inference 
