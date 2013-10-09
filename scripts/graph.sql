@@ -1377,23 +1377,34 @@ declare
    v_intersection_id integer ;
    v_p_class_tid integer;
    v_equivalent_cls_id integer;
+   v_union_id integer;
 begin
    select id into v_subclass_id from property where name = 'subClassOf' and kbid = theKbid;
    select rt.id into v_intersection_id from resourcetype rt where rt.rtype = 'x';
+   select rt.id into v_union_id from resourcetype rt where rt.rtype = 'u';
    select rt.id into v_p_class_tid from resourcetype rt where rt.rtype = 'c';
 
-   -- process equivalent classes first
+   -- process equivalentclass intersectionOf first
    select id into v_equivalent_cls_id from property where name = 'equivalentClass' and kbid = theKbid;
 
    insert into graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden)
-     select  e.rid1, v_p_class_tid, v_subclass_id, i.classid, i.rtid, theKbid, true, false 
+     select  e.rid1, e.rtid1, v_subclass_id, i.classid, i.rtid, theKbid, true, false 
      from graph_edges_all e, intersectionclass i
       where e.pid = v_equivalent_cls_id and e.kbid = theKbid and e.rid2 = i.id and e.rtid2 = v_intersection_id 
            and i.rtid in ( v_p_class_tid,v_intersection_id)
            and not exists(select * from graph_edges_all e2 
                           where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 
-                              and e.pid =e2.pid and i.classid = e2.rid2 and i.rtid = e2.rtid2);
+                              and v_subclass_id = e2.pid and i.classid = e2.rid2 and i.rtid = e2.rtid2);
 
+   -- process equivalentclass unionOf
+   insert into graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden)
+     select  i.classid, i.rtid, v_subclass_id, e.rid1, e.rtid1, theKbid, true, false 
+     from graph_edges_all e, unionclass i
+      where e.pid = v_equivalent_cls_id and e.kbid = theKbid and e.rid2 = i.id and e.rtid2 = v_union_id
+           and not exists(select * from graph_edges_all e2 
+                          where i.classid = e2.rid1 and i.rtid = e2.rtid1 
+                              and v_subclass_id = e2.pid and e.rid1 = e2.rid2 and e.rid2 = e2.rtid2);
+  
    -- process subclassof
    drop table if exists tmp_inferred_sc_edges;
    create temp table tmp_inferred_sc_edges
