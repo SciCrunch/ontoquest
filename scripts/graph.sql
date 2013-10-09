@@ -35,6 +35,8 @@ CREATE INDEX node_label ON graph_nodes_all(label);
 
 CREATE INDEX node_label2 ON graph_nodes_all(lower(label), is_obsolete, kbid);
 
+CREATE INDEX graph_nodes_rid_idx ON graph_nodes_all USING btree (rid);
+
 create view graph_nodes as select * from graph_nodes_all where is_obsolete = false;
 
 /*
@@ -55,6 +57,7 @@ create view graph_nodes as select * from graph_nodes_all where is_obsolete = fal
  * @col is_obsolete -- if true, the edge is deprecated.
  */
 
+
 create table graph_edges_all (
   rid1 integer NOT NULL,
   rtid1 integer NOT NULL,
@@ -68,8 +71,10 @@ create table graph_edges_all (
   restriction_stmt varchar(255),
   is_obsolete boolean default false,
   constraint rtype_chk CHECK (restriction_type in ('a', 'v', 'b', 'm', 'n', null))
-  ,foreign key (rid1, rtid1) references graph_nodes_all(rid, rtid) ON DELETE CASCADE
-  ,foreign key (rid2, rtid2) references graph_nodes_all(rid, rtid) ON DELETE CASCADE
+  ,foreign key (rid1, rtid1) references graph_nodes_all(rid, rtid) MATCH FULL
+      ON UPDATE no action ON DELETE CASCADE
+  ,foreign key (rid2, rtid2) references graph_nodes_all(rid, rtid) MATCH FULL
+      ON UPDATE no action ON DELETE CASCADE
 ) with oids;
 
 -- create index on graph_edges
@@ -81,7 +86,14 @@ CREATE INDEX edge_pid ON graph_edges_all (pid);
 
 CREATE INDEX edge_kbid ON graph_edges_all (kbid);
 
-create view graph_edges as select * from graph_edges_all where is_obsolete = false;
+create or replace view graph_edges as select * from graph_edges_all where is_obsolete = false;
+
+CREATE INDEX edge_pid_kbid ON graph_edges_all USING btree (pid, kbid);
+
+CREATE INDEX graph_edges_all_r1idx  ON graph_edges_all USING btree (rid1);
+
+CREATE INDEX graph_edges_rid2idx  ON graph_edges_all USING btree (rid2);
+
 
 
 CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursive BOOLEAN) RETURNS TEXT AS $$
@@ -413,20 +425,22 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
 		-- insert inferred edge from intersection class.
 		-- e.g. X -- subclassOf/equivalent -> (intersectionOf(A, B, C)) will generate:
 		-- X subclassOf/equivalent A, X subClassOf/equivalent B, X subClassOf/equivalent C
-		INSERT INTO graph_edges_all select distinct e.rid1, e.rtid1, e.pid, i.classid, i.rtid, e.kbid, true, false,
+    -- this rule is replaced by the new infer_subclass_intersect function, because it generates wrong edges.
+/*		INSERT INTO graph_edges_all select distinct e.rid1, e.rtid1, e.pid, i.classid, i.rtid, e.kbid, true, false,
 		null as restriction_type, null as restriction_stmt
 		from graph_edges_all e, intersectionclass i, resourcetype rt
 		where e.rid2 = i.id and e.rtid2 = rt.id and rt.rtype = 'x' and e.kbid = theKbid
 		and not exists(select * from graph_edges_all e2 where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 and e.pid =e2.pid
 		and i.classid = e2.rid2 and i.rtid = e2.rtid2);
    raise notice 'Iteration %, inserted inferred intersection classes', j;
-		
+*/		
 		-- insert inferred edge from allValuesFrom class.
 		-- e.g. Wine -- subclassOf/equivalent/intersectionOf -> (something --:forall:hasMaker-> Winery) will generate:
 		-- Wine -- :forall:hasMaker -> Winery
-		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
+    -- removed by cj, for now, until we review this again
+/*		INSERT INTO graph_edges_all select distinct s.rid1, s.rtid1, t.propertyid, t.rangeclassid, t.rtid, t.kbid, true, false, 'v', 'exists'
         from allvaluesfromclass t, graph_edges_all s, resourcetype rt, property p
-        where s.rid2 = t.id and s.rtid2 = rt.id and rt.rtype = 'v' and s.pid = p.id and p.name in ('equivalentClass', 'subClassOf', 'intersectionOf')
+        where s.rid2 = t.id and s.rtid2 = rt.id and rt.rtype = 'v' and s.pid = p.id and p.name in ( 'subClassOf', 'intersectionOf')
         and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
         and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
         and not exists(select * from graph_edges_all e2 where s.rid1=e2.rid1 and s.rtid1=e2.rtid1 and t.propertyid=e2.pid
@@ -441,7 +455,7 @@ CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer)
       and not exists(select * from graph_edges_all e2 where s.rid1=e2.rid1 and s.rtid1=e2.rtid1 and t.propertyid=e2.pid
           and t.rangeclassid=e2.rid2 and t.rtid=e2.rtid2) and s.kbid = theKbid;		
   raise notice 'Iteration %, inserted inferred someValuesFrom classes', j;
-		
+*/		
 	END LOOP;
  
     -- for inversedOf property, add its inversed edge
@@ -528,15 +542,144 @@ CREATE OR REPLACE FUNCTION update_inference_edges2(theKbid integer)
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION update_graph(theKbid integer) 
-  RETURNS BOOLEAN AS $$
-  DECLARE
-    result boolean := false;
-  BEGIN
-    select update_graph(theKbid, true) into result;
-	return result;
-  END;
-$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_equivalent_class_group(thekbid integer)
+  RETURNS void AS
+$BODY$
+DECLARE
+    mvrec equivalentclass%ROWTYPE;
+    rep_id integer;
+    class_rtid integer;
+BEGIN
+    
+    select id into class_rtid from resourcetype where name = 'primitiveclass';
+    delete from equivalentclassgroup where kbid = thekbid; 
+
+    FOR mvrec IN SELECT * from equivalentclass e where e.class_rtid2 = class_rtid
+    LOOP
+      if exists ( select 1 from equivalentclassgroup c
+                  where (c.rid = mvrec.classid1 and c.ridm = mvrec.classid2) 
+                    or ( c.rid = mvrec.classid2 and c.ridm = mvrec.classid1))
+      then 
+         RAISE NOTICE  '%, %  already exists in group table, ignoring it.', mvrec.classid1,mvrec.classid2;
+      elsif exists ( select 1 from equivalentclassgroup c where c.rid = mvrec.classid1)
+      then
+         RAISE NOTICE '% is representitive in group, adding % to the group.', mvrec.classid1 ,  mvrec.classid2;
+
+         -- check if representitive is an obsolete node
+         if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = mvrec.classid1 and n1.rtid = class_rtid)
+            and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid2 and n2.rtid = class_rtid)
+         then 
+            update equivalentclassgroup
+               set rid = mvrec.classid2
+            where rid = mvrec.classid1;
+
+            insert into equivalentclassgroup (rid, ridm, kbid) values
+              (mvrec.classid2, mvrec.classid1, thekbid);
+
+            update graph_edges_all ge
+              set rid1 = mvrec.classid2
+            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid;
+             
+         else 
+            insert into equivalentclassgroup (rid, ridm, kbid) values
+              (mvrec.classid1, mvrec.classid2, thekbid);
+            update graph_edges_all ge
+              set rid1 = mvrec.classid1
+            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1=class_rtid;
+         end if;
+      elsif exists ( select 1 from equivalentclassgroup c where c.rid = mvrec.classid2)
+      then
+         RAISE NOTICE '% is not a member, but % is a representitive , add it to group.', mvrec.classid1, mvrec.classid2 ;
+
+         -- check if representitive is an obsolete node
+	 if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = mvrec.classid2 and n1.rtid=class_rtid)
+            and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid1 and n2.rtid=class_rtid)
+         then 
+            update equivalentclassgroup
+               set rid = mvrec.classid1
+            where rid = mvrec.classid2;
+
+            insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid1, mvrec.classid2, thekbid);
+            update graph_edges_all ge 
+            set rid1 = mvrec.classid1
+            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1=class_rtid;
+         else 
+            insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2, mvrec.classid1, thekbid);
+            update graph_edges_all ge
+              set rid1 = mvrec.classid2
+            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid;
+         end if;
+      elsif exists ( select 1 from equivalentclassgroup c where c.ridm = mvrec.classid2)
+      then
+         select rid into rep_id from equivalentclassgroup c where c.ridm = mvrec.classid2;
+         RAISE NOTICE '% is not in group, but % is a member, adding it to group %' , mvrec.classid1,mvrec.classid2, rep_id ;
+         -- check if representitive is an obsolete node
+	 if (select is_obsolete from graph_nodes_all where rid = rep_id and rtid=class_rtid)
+            and not (select is_obsolete from graph_nodes_all where rid = mvrec.classid1 and rtid=class_rtid)
+         then 
+            update equivalentclassgroup
+               set rid = mvrec.classid1
+            where rid = rep_id;
+            insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid1, rep_id, thekbid);
+            update graph_edges_all ge
+              set rid1 = mvrec.classid1
+            where ge.rid1 = rep_id and ge.kbid = thekbid and ge.rtid1=class_rtid; 
+         else
+            insert into equivalentclassgroup (rid, ridm, kbid) values (rep_id, mvrec.classid1, thekbid);
+            update graph_edges_all ge
+              set rid1 = rep_id
+            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid; 
+         end if;
+      elsif exists ( select 1 from equivalentclassgroup c where c.ridm = mvrec.classid1)
+      then
+         select rid into rep_id from equivalentclassgroup c where c.ridm = mvrec.classid1;
+         RAISE NOTICE  '% is a member, but % is not in any group, adding % to group %' ,mvrec.classid1,mvrec.classid2,mvrec.classid2,rep_id;
+         -- check if representitive is an obsolete node
+	 if (select is_obsolete from graph_nodes_all where rid = rep_id and rtid=class_rtid)
+            and not (select is_obsolete from graph_nodes_all where rid = mvrec.classid2 and rtid=class_rtid)
+         then 
+            update equivalentclassgroup
+               set rid = mvrec.classid2
+            where rid = rep_id;
+
+            insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2, rep_id, thekbid);
+            update graph_edges_all ge
+               set rid1 = mvrec.classid2
+            where ge.rid1 = rep_id and ge.kbid = thekbid and ge.rtid1=class_rtid;
+         else 
+            insert into equivalentclassgroup (rid, ridm, kbid) values
+               (rep_id, mvrec.classid2, thekbid);
+            update graph_edges_all ge
+               set rid1 = rep_id
+            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1=class_rtid;
+         end if;
+      else 
+         RAISE NOTICE '% and % are not in any group, creating new group.', mvrec.classid1,mvrec.classid2;
+         -- check if the first node is an obsolete node
+         if (select is_obsolete from graph_nodes_all where rid = mvrec.classid1 and rtid=class_rtid)
+            and not (select is_obsolete from graph_nodes_all where rid = mvrec.classid2 and rtid=class_rtid)
+         then    
+	    insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2,mvrec.classid1, thekbid);
+            update graph_edges_all ge
+               set rid1 = mvrec.classid2
+            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid;
+         else
+            insert into equivalentclassgroup (rid, ridm, kbid) values
+               (mvrec.classid1, mvrec.classid2, thekbid);
+            update graph_edges_all ge
+               set rid1 = mvrec.classid1
+            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1 = class_rtid;
+         end if;
+      end if; 
+    END LOOP;
+
+    RAISE NOTICE 'Done merging equivalent classes.';
+    
+END;
+$BODY$
+  LANGUAGE plpgsql;
+
 
 /*
   Transform an owl knowledge base to a graph easy to view. Node table as 6 columns: rid, rtid, name, label, kbid, is_anonymous.
@@ -625,8 +768,9 @@ $$ LANGUAGE plpgsql;
   *) update status of some hidden edges. If a restriction appears as object of another non-hidden edge (edge A), 
      set the corresponding restriction edge (edge B) to non-hidden. Otherwise, edge A cannot be reached. 
 */
-CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean) 
-  RETURNS BOOLEAN AS $$
+CREATE OR REPLACE FUNCTION update_graph(thekbid integer, setlabelflag boolean)
+  RETURNS boolean AS
+$BODY$
 
   DECLARE
     owlRestrictionRid integer;
@@ -645,8 +789,9 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
 
     SELECT p.id, rt.id INTO owlRestrictionRid, owlRestrictionRtid FROM primitiveclass p, resourcetype rt where p.name = 'Restriction' and rt.rtype = 'c' and is_system = true and kbid = theKbid;
 
-	SELECT id into owlNSID from namespace where prefix = 'owl:' and kbid = theKbid;
+    SELECT id into owlNSID from namespace where prefix = 'owl:' and kbid = theKbid;
 
+        -- raise error if owlRestrictionRid is not found.
 	IF owlRestrictionRid is null OR owlRestrictionRid <= 0 THEN
 		
 		INSERT INTO primitiveclass (name,is_system,is_owlclass,is_deprecated,nsid,kbid,browsertext) values (
@@ -665,9 +810,9 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
 		SELECT rt.id into onPropertyRtid from resourcetype rt where rt.rtype = 'p';
 	END IF;
 	
- 	SELECT id into rdfNSID from namespace where prefix = 'rdf:' and kbid = theKbid;
+    SELECT id into rdfNSID from namespace where prefix = 'rdf:' and kbid = theKbid;
 
-	SELECT p.id, rt.id INTO rdfTypeRid, rdfTypeRtid FROM property p, resourcetype rt where p.name = 'type' and rt.rtype = 'p' and is_system = true and kbid = theKbid;
+    SELECT p.id, rt.id INTO rdfTypeRid, rdfTypeRtid FROM property p, resourcetype rt where p.name = 'type' and rt.rtype = 'p' and is_system = true and kbid = theKbid;
 
 	IF rdfTypeRid is null OR rdfTypeRid  <= 0 THEN
 		INSERT INTO property (name,is_object,is_owl,is_system,nsid,kbid,browsertext) values (
@@ -678,25 +823,30 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
 	END IF;
 
     -- insert primitive classes into nodes table
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, r.name, null, kbid, false, false, get_ontology(r.id, rt.id)
-      FROM primitiveclass r, resourcetype rt WHERE kbid = theKbid --and is_system = false -- and is_owlclass = true 
-      and rt.name = 'primitiveclass';
+    INSERT INTO graph_nodes_all SELECT r.id as rid, 
+       (select rt.id from resourcetype rt where rt.name = 'primitiveclass') as rtid, r.name, null, 
+       r.kbid, false, false, ns.url||r.name as url
+      FROM primitiveclass r left outer join namespace ns on r.nsid = ns.id
+      WHERE r.kbid = theKbid --and is_system = false -- and is_owlclass = true 
+    ;
     raise notice 'Added all primitive classes as nodes.';
 
     -- insert individuals into nodes table
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, r.name, null, kbid, false, false, get_ontology(r.id, rt.id)
-      FROM individual r, resourcetype rt WHERE kbid = theKbid --and is_owl = true
-      and rt.name = 'individual';
+    INSERT INTO graph_nodes_all SELECT r.id as rid, 
+      (select rt.id from resourcetype rt where rt.name = 'individual') as rtid, r.name, null, r.kbid, false, false, 
+      ns.url||r.name as url
+      FROM individual r left outer join namespace ns on r.nsid = ns.id WHERE r.kbid = theKbid --and is_owl = true
+      ;
     raise notice 'Added all individuals as nodes.';
 
     -- insert properties into nodes table
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, r.name, null, kbid, false, false, get_ontology(r.id, rt.id)
-      FROM property r, resourcetype rt WHERE kbid = theKbid
-      and rt.name = 'property';
+    INSERT INTO graph_nodes_all SELECT r.id as rid, (select rt.id from resourcetype rt where rt.name = 'property') as rtid, r.name, null, r.kbid, false, false, 
+      ns.url||r.name as url
+      FROM property r left outer join namespace ns on r.nsid = ns.id WHERE r.kbid = theKbid;
     raise notice 'Added all properties as nodes.';
 
     -- insert literals into nodes table
-    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, r.lexicalform, null, kbid, false, false, null
+    INSERT INTO graph_nodes_all SELECT r.id as rid, rt.id as rtid, substring(r.lexicalform for 1500), null, kbid, false, false, null
       FROM literal r, resourcetype rt WHERE kbid = theKbid
       and rt.name = 'literal';
     raise notice 'Added all literals as nodes.';
@@ -803,6 +953,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     raise notice 'added all ontology uri as nodes.';
 
     -- insert subclassOf edges, remove those representing equivalent classes 
+    -- I removed all the data integrity checking in the statements bellow, because we are using foreign keys in the graph_edges table to ensure that.
     INSERT INTO graph_edges_all select distinct childid, child_rtid, p.id as pid, parentid, parent_rtid, t.kbid, false, 
     false as hidden, -- hidden to be false
  --     case when parent_rtid in (2,3,4,5,6,10,16) or child_rtid in (2,3,4,5,6,10,16) then true else false end as hidden,
@@ -810,8 +961,6 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       from subclassof t, property p where p.name = 'subClassOf' and p.is_system = true and p.kbid = t.kbid and 
       not exists(select * from subclassof t2 where t2.childid = t.parentid and t2.child_rtid = t.parent_rtid 
         and t2.parentid = t.childid and t2.parent_rtid = t.child_rtid) 
-      and exists(select * from graph_nodes_all n where childid = n.rid and child_rtid = n.rtid)
-      and exists(select * from graph_nodes_all n where parentid = n.rid and parent_rtid = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added subclassOf relationships as edges.';
 
@@ -826,17 +975,19 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct t.instanceid, t.instance_rtid, p.id as pid, t.classid, t.class_rtid, 
       t.kbid, false, false, null as restriction_type, null as restriction_stmt 
       from typeof t, property p where p.name = 'type' and p.is_system = true and p.kbid = t.kbid
-      and exists (select * from graph_nodes_all n where t.classid = n.rid and t.class_rtid = n.rtid)
+--      and exists (select * from graph_nodes_all n where t.classid = n.rid and t.class_rtid = n.rtid)
 --      and exists (select * from graph_nodes_all n where t.instanceid = n.rid and t.instance_rtid = n.rtid)
       and instance_rtid != 1 and t.kbid = theKbid;
     raise notice 'added typeof relationships as edges.';
 
     -- insert relationship edges
     INSERT INTO graph_edges_all select distinct subjectid, subject_rtid, propertyid, objectid, object_rtid, t.kbid, 
-      false, false, null as restriction_type, null as restriction_stmt from relationship t where 
-      exists(select * from graph_nodes_all n where subjectid = n.rid and subject_rtid = n.rtid)
-      and exists(select * from graph_nodes_all n where objectid = n.rid and object_rtid = n.rtid)
-      and t.kbid = theKbid;
+      false, false, null as restriction_type, null as restriction_stmt 
+      from relationship t where 
+--          exists(select * from graph_nodes_all n where subjectid = n.rid and subject_rtid = n.rtid)
+--      and exists(select * from graph_nodes_all n where objectid = n.rid and object_rtid = n.rtid)
+      --and
+       t.kbid = theKbid;
     raise notice 'added user-defined relationships as edges.';
 
     -- insert subPropertyOf edges
@@ -845,8 +996,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       from subpropertyof t, property p, resourcetype rt 
       where p.name = 'subPropertyOf' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'p' and
       not exists(select * from subpropertyof t2 where t2.childid = t.parentid and t2.parentid = t.childid) 
-      and exists(select * from graph_nodes_all n where childid = n.rid and n.rtid = rt.id)
-      and exists(select * from graph_nodes_all n where parentid = n.rid and n.rtid = rt.id)
+  --    and exists(select * from graph_nodes_all n where childid = n.rid and n.rtid = rt.id)
+  --    and exists(select * from graph_nodes_all n where parentid = n.rid and n.rtid = rt.id)
       and t.kbid = theKbid;
     raise notice 'added subPropertyOf relationships as edges.';
 
@@ -855,8 +1006,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from equivalentproperty t, property p, resourcetype rt 
       where p.name = 'equivalentProperty' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'p'
-      and exists(select * from graph_nodes_all n where propertyid1 = n.rid and n.rtid = 15)
-      and exists(select * from graph_nodes_all n where propertyid2 = n.rid and n.rtid = 15)
+--      and exists(select * from graph_nodes_all n where propertyid1 = n.rid and n.rtid = 15)
+--      and exists(select * from graph_nodes_all n where propertyid2 = n.rid and n.rtid = 15)
       and t.kbid = theKbid;
     raise notice 'added equivalentProperty relationships as edges.';
 
@@ -865,8 +1016,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from inversepropertyof t, property p, resourcetype rt 
       where p.name = 'inverseOf' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'p'
-      and exists(select * from graph_nodes_all n where propertyid1 = n.rid and n.rtid = 15)
-      and exists(select * from graph_nodes_all n where propertyid2 = n.rid and n.rtid = 15)
+ --     and exists(select * from graph_nodes_all n where propertyid1 = n.rid and n.rtid = 15)
+ --     and exists(select * from graph_nodes_all n where propertyid2 = n.rid and n.rtid = 15)
       and t.kbid = theKbid;
     raise notice 'added inverseOf relationships as edges.';
 
@@ -874,18 +1025,26 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct classid1, rtid1, p.id as pid, classid2, rtid2, t.kbid, false, false,
       null as restriction_type, null as restriction_stmt
       from disjointclass t, property p where p.name = 'disjointWith' and p.is_system = true and p.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where classid1 = n.rid and rtid1 = n.rtid)
-      and exists(select * from graph_nodes_all n where classid2 = n.rid and rtid2 = n.rtid)
+ --     and exists(select * from graph_nodes_all n where classid1 = n.rid and rtid1 = n.rtid)
+ --     and exists(select * from graph_nodes_all n where classid2 = n.rid and rtid2 = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added disjointclass relationships as edges.';
+
+    -- insert disjointUnion edges
+    INSERT INTO graph_edges_all select distinct t.pclassid, t.prtid, 
+      (select p.id from property p where p.name = 'disjointUnion' and p.is_system = true and p.kbid = t.kbid) as pid, 
+      t.cclassid, t.crtid, t.kbid, false, false,
+      null as restriction_type, null as restriction_stmt
+      from disjointUnionclass t where t.kbid = theKbid;
+    raise notice 'added disjointUnion relationships as edges.';
 
     -- insert differentFrom edges
     INSERT INTO graph_edges_all select distinct individualid1, rt.id, p.id as pid, individualid2, rt.id, t.kbid, 
       false, false, null as restriction_type, null as restriction_stmt
       from differentindividual t, property p, resourcetype rt 
       where p.name = 'differentFrom' and p.is_system = true and p.kbid = t.kbid and rt.rtype='i'
-      and exists(select * from graph_nodes_all n where individualid1 = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where individualid2 = n.rid and rt.id = n.rtid)
+   --   and exists(select * from graph_nodes_all n where individualid1 = n.rid and rt.id = n.rtid)
+   --   and exists(select * from graph_nodes_all n where individualid2 = n.rid and rt.id = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added differentFrom relationships as edges.';
 
@@ -894,8 +1053,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       false, false, null as restriction_type, null as restriction_stmt
       from sameindividual t, property p, resourcetype rt 
       where p.name = 'sameAs' and p.is_system = true and p.kbid = t.kbid and rt.rtype='i'
-      and exists(select * from graph_nodes_all n where individualid1 = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where individualid2 = n.rid and rt.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where individualid1 = n.rid and rt.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where individualid2 = n.rid and rt.id = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added sameAs relationships as edges.';
 
@@ -927,8 +1086,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct t1.domainid, t1.rtid as rtid1, t1.propertyid, t2.rangeid, 
       t2.rtid as rtid2, t1.kbid, false, false, null as restriction_type, null as restriction_stmt
       from domain t1, range t2 where t1.propertyid = t2.propertyid and t1.kbid = t2.kbid
-      and exists(select * from graph_nodes_all n where domainid = n.rid and t1.rtid = n.rtid)
-      and exists(select * from graph_nodes_all n where rangeid = n.rid and t2.rtid = n.rtid)
+--      and exists(select * from graph_nodes_all n where domainid = n.rid and t1.rtid = n.rtid)
+--      and exists(select * from graph_nodes_all n where rangeid = n.rid and t2.rtid = n.rtid)
       and t1.kbid = theKbid;
     raise notice 'added inferred domain-range relationships as edges.';
     
@@ -936,8 +1095,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       rt.id as rtid2, t1.kbid, true, false, null as restriction_type, null as restriction_stmt
       from domain t1, resourcetype rt, primitiveclass c where rt.rtype = 'c' and c.name = 'Thing' and c.is_system = true
       and c.kbid = t1.kbid and not exists (select * from range t2 where t1.propertyid = t2.propertyid)
-      and exists(select * from graph_nodes_all n where domainid = n.rid and t1.rtid = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where domainid = n.rid and t1.rtid = n.rtid)
+ --     and exists(select * from graph_nodes_all n where c.id = n.rid and rt.id = n.rtid)
       and t1.kbid = theKbid;
     raise notice 'added domain relationships as edges.';
 
@@ -945,8 +1104,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       t1.kbid, true, false, null as restriction_type, null as restriction_stmt
       from range t1, resourcetype rt, primitiveclass c where rt.rtype = 'c' and c.name = 'Thing' and c.is_system = true
       and c.kbid = t1.kbid and not exists (select * from domain t2 where t1.propertyid = t2.propertyid)
-      and exists(select * from graph_nodes_all n where rangeid = n.rid and t1.rtid = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where rangeid = n.rid and t1.rtid = n.rtid)
+--      and exists(select * from graph_nodes_all n where c.id = n.rid and rt.id = n.rtid)
       and t1.kbid = theKbid;
     raise notice 'added range relationships as edges.';
 
@@ -955,8 +1114,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from domain t, property p, resourcetype rt 
       where p.name = 'domain' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'p'
-      and exists(select * from graph_nodes_all n where propertyid = n.rid and n.rtid = 15)
-      and exists(select * from graph_nodes_all n where t.domainid = n.rid and n.rtid = t.rtid)
+  --    and exists(select * from graph_nodes_all n where propertyid = n.rid and n.rtid = 15)
+  --    and exists(select * from graph_nodes_all n where t.domainid = n.rid and n.rtid = t.rtid)
       and t.kbid = theKbid;
     raise notice 'added domain as properties of the restricted property into edge table.';
 
@@ -964,8 +1123,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from range t, property p, resourcetype rt 
       where p.name = 'range' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'p'
-      and exists(select * from graph_nodes_all n where propertyid = n.rid and n.rtid = 15)
-      and exists(select * from graph_nodes_all n where t.rangeid = n.rid and n.rtid = t.rtid)
+ --     and exists(select * from graph_nodes_all n where propertyid = n.rid and n.rtid = 15)
+ --     and exists(select * from graph_nodes_all n where t.rangeid = n.rid and n.rtid = t.rtid)
       and t.kbid = theKbid;
     raise notice 'added domain as properties of the restricted property into edge table.';
 
@@ -974,7 +1133,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       false, false, null as restriction_type, null as restriction_stmt
       from complementclass t, property p, resourcetype rt 
       where p.name = 'complementOf' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 't'
-      and exists(select * from graph_nodes_all n where t.complementclassid = n.rid and n.rtid = t.rtid)
+   --   and exists(select * from graph_nodes_all n where t.complementclassid = n.rid and n.rtid = t.rtid)
       and t.kbid = theKbid;
     raise notice 'added complementOf relationships as edges.';
 
@@ -983,7 +1142,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from unionclass t, property p, resourcetype rt 
       where p.name = 'unionOf' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'u'
-      and exists(select * from graph_nodes_all n where t.classid = n.rid and n.rtid = t.rtid)
+ --     and exists(select * from graph_nodes_all n where t.classid = n.rid and n.rtid = t.rtid)
       and t.kbid = theKbid;
     raise notice 'added unionOf relationships as edges.';
     
@@ -992,7 +1151,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from intersectionclass t, property p, resourcetype rt 
       where p.name = 'intersectionOf' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'x'
-      and exists(select * from graph_nodes_all n where t.classid = n.rid and n.rtid = t.rtid)
+  --    and exists(select * from graph_nodes_all n where t.classid = n.rid and n.rtid = t.rtid)
       and t.kbid = theKbid;
     raise notice 'added intersectionOf relationships as edges.';
 
@@ -1011,7 +1170,7 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from oneof t, property p, resourcetype rt 
       where p.name = 'oneOf' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'o'
-      and exists(select * from graph_nodes_all n where t.valueid = n.rid and n.rtid = t.rtid)
+--      and exists(select * from graph_nodes_all n where t.valueid = n.rid and n.rtid = t.rtid)
       and t.kbid = theKbid;
     raise notice 'added oneOf relationships as edges.';
     
@@ -1020,15 +1179,15 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       null as restriction_type, null as restriction_stmt
       from alldifferentindividual t, property p, resourcetype rt, resourcetype rt2 
       where p.name = 'distinctMembers' and p.is_system = true and p.kbid = t.kbid and rt.rtype = 'y' and rt2.rtype = 'i'
-      and exists(select * from graph_nodes_all n where t.individualid = n.rid and n.rtid = rt2.id)
+--      and exists(select * from graph_nodes_all n where t.individualid = n.rid and n.rtid = rt2.id)
       and t.kbid = theKbid;
     raise notice 'added allDifferentIndividual relationships as edges.';
 
     -- insert allValuesFrom edges (hidden)
     INSERT INTO graph_edges_all select distinct t.id, rt.id, propertyid, rangeclassid, t.rtid, t.kbid, false, true, 'a', 'forall'
       from allvaluesfromclass t, resourcetype rt where rt.rtype = 'a'
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
+  --    and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+  --    and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added allValuesFrom relationships as hidden edges.';
 
@@ -1063,8 +1222,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     -- insert someValuesFrom edges (hidden)
     INSERT INTO graph_edges_all select distinct t.id, rt.id, propertyid, rangeclassid, t.rtid, t.kbid, false, true, 'v', 'exists'
       from somevaluesfromclass t, resourcetype rt where rt.rtype = 'v'
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
+--      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where rangeclassid = n.rid and t.rtid = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added someValuesFrom relationships as hidden edges.';
 
@@ -1098,8 +1257,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct t.id, rt.id, propertyid, c.id, rt2.id, t.kbid, false, true, 'b', 'cardinality='||cardinality
       from cardinalityclass t, resourcetype rt, datatype c, resourcetype rt2 
       where rt.rtype = 'b' and rt2.rtype = 'd' and c.name = 'int' and c.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added cardinality relationships as hidden edges.';
 
@@ -1109,8 +1268,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct s.childid, s.child_rtid, t.propertyid, c.id, rt2.id, t.kbid, true, false, 'b', 'cardinality='||cardinality
       from cardinalityclass t, resourcetype rt, datatype c, resourcetype rt2, subclassof s
       where s.parentid = t.id and s.parent_rtid = rt.id and rt.rtype = 'b' and rt2.rtype = 'd' and c.name = 'int' and c.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
       and not exists(select * from graph_edges_all e2 where s.childid=e2.rid1 and s.child_rtid=e2.rtid1 and t.propertyid=e2.pid
           and c.id=e2.rid2 and rt2.id=e2.rtid2)
       and t.kbid = theKbid;
@@ -1120,8 +1279,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct t.id, rt.id, propertyid, c.id, rt2.id, t.kbid, false, true, 'm', 'cardinality>='||mincardinality
       from mincardinalityclass t, resourcetype rt, datatype c, resourcetype rt2 
       where rt.rtype = 'm' and rt2.rtype = 'd' and c.name = 'int' and c.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added minCardinality relationships as hidden edges.';
 
@@ -1129,8 +1288,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct s.childid, s.child_rtid, t.propertyid, c.id, rt2.id, t.kbid, true, false, 'm', 'cardinality>='||mincardinality
       from mincardinalityclass t, resourcetype rt, datatype c, resourcetype rt2, subclassof s
       where s.parentid = t.id and s.parent_rtid = rt.id and rt.rtype = 'm' and rt2.rtype = 'd' and c.name = 'int' and c.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
       and not exists(select * from graph_edges_all e2 where s.childid=e2.rid1 and s.child_rtid=e2.rtid1 and t.propertyid=e2.pid
           and c.id=e2.rid2 and rt2.id=e2.rtid2)
       and t.kbid = theKbid;
@@ -1140,8 +1299,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct t.id, rt.id, propertyid, c.id, rt2.id, t.kbid, false, true, 'n', 'cardinality<='||maxcardinality
       from maxcardinalityclass t, resourcetype rt, datatype c, resourcetype rt2 
       where rt.rtype = 'n' and rt2.rtype = 'd' and c.name = 'int' and c.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+--      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
       and t.kbid = theKbid;
     raise notice 'added maxCardinality relationships as hidden edges.';
 
@@ -1149,8 +1308,8 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     INSERT INTO graph_edges_all select distinct s.childid, s.child_rtid, t.propertyid, c.id, rt2.id, t.kbid, true, false, 'n', 'cardinality<='||maxcardinality
       from maxcardinalityclass t, resourcetype rt, datatype c, resourcetype rt2, subclassof s
       where s.parentid = t.id and s.parent_rtid = rt.id and rt.rtype = 'n' and rt2.rtype = 'd' and c.name = 'int' and c.kbid = t.kbid
-      and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
-      and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where t.id = n.rid and rt.id = n.rtid)
+ --     and exists(select * from graph_nodes_all n where c.id = n.rid and rt2.id = n.rtid)
       and not exists(select * from graph_edges_all e2 where s.childid=e2.rid1 and s.child_rtid=e2.rtid1 and t.propertyid=e2.pid
           and c.id=e2.rid2 and rt2.id=e2.rtid2)
       and t.kbid = theKbid;
@@ -1177,6 +1336,12 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
       and exists (select * from graph_edges_all g2 where g2.rtid2 = g1.rtid1 and g2.rid2 = g1.rid1 and g2.hidden = false);
     raise notice 'updated the status of hidden edges.';
 
+
+    -- merge the nodes that are excactly equivalent 
+    perform update_equivalent_class_group(theKbid);
+    
+    
+
     -- update node labels.
 	perform set_labels(theKbid, setLabelFlag);
 	raise notice 'updated node labels.';
@@ -1188,4 +1353,87 @@ CREATE OR REPLACE FUNCTION update_graph(theKbid integer, setLabelFlag boolean)
     RETURN true;
 
   END;
+$BODY$
+  LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION update_graph(theKbid integer) 
+  RETURNS BOOLEAN AS $$
+  DECLARE
+    result boolean := false;
+  BEGIN
+    select update_graph(theKbid, true) into result;
+	return result;
+  END;
 $$ LANGUAGE plpgsql;
+
+
+create or replace function infer_subclass_intersect (theKbid integer)
+returns boolean as $$
+declare 
+   v_result boolean := false;
+   v_subclass_id integer;
+   v_updated integer := 0;
+   v_intersection_id integer ;
+   v_p_class_tid integer;
+   v_equivalent_cls_id integer;
+begin
+   select id into v_subclass_id from property where name = 'subClassOf' and kbid = theKbid;
+   select rt.id into v_intersection_id from resourcetype rt where rt.rtype = 'x';
+   select rt.id into v_p_class_tid from resourcetype rt where rt.rtype = 'c';
+
+   -- process equivalent classes first
+   select id into v_equivalent_cls_id from property where name = 'equivalentClass' and kbid = theKbid;
+
+   insert into graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden)
+     select  e.rid1, v_p_class_tid, v_subclass_id, i.classid, i.rtid, theKbid, true, false 
+     from graph_edges_all e, intersectionclass i
+      where e.pid = v_equivalent_cls_id and e.kbid = theKbid and e.rid2 = i.id and e.rtid2 = v_intersection_id 
+           and i.rtid in ( v_p_class_tid,v_intersection_id)
+           and not exists(select * from graph_edges_all e2 
+                          where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 
+                              and e.pid =e2.pid and i.classid = e2.rid2 and i.rtid = e2.rtid2);
+
+   -- process subclassof
+   drop table if exists tmp_inferred_sc_edges;
+   create temp table tmp_inferred_sc_edges
+      (rid1 bigint, rid2 bigint, rid_new bigint, rtid_new bigint);
+  
+   insert into tmp_inferred_sc_edges (rid1, rid2, rid_new, rtid_new)
+      select e.rid1, e.rid2, i.classid, i.rtid
+      from graph_edges_all e, intersectionclass i
+      where e.pid = v_subclass_id and e.kbid = theKbid and e.rid2 = i.id and e.rtid2 = v_intersection_id -- and i.rtid in (1,8)
+           and not exists(select * from graph_edges_all e2 
+                          where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 
+                              and e.pid =e2.pid and i.classid = e2.rid2 and i.rtid = e2.rtid2);
+
+   loop 
+     insert into graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden)
+     select  t.rid1, v_p_class_tid, v_subclass_id, t.rid_new, t.rtid_new, theKbid, true, false 
+     from tmp_inferred_sc_edges t where t.rtid_new <> v_intersection_id;
+
+     delete from tmp_inferred_sc_edges t where t.rtid_new <> v_intersection_id;
+     
+     if (select count(*) from tmp_inferred_sc_edges t) = 0 then 
+       exit;    -- exit loop
+     else 
+       create temp table tmp_inferred_sc_edges2 (rid1 bigint, rid2 bigint, rid_new bigint, rtid_new bigint);
+       insert into tmp_inferred_sc_edges2 (rid1, rid2, rid_new, rtid_new)
+       select e.rid1, e.rid2, i.classid, i.rtid
+         from tmp_inferred_sc_edges e, intersectionclass i
+         where e.rid_new = i.id and e.rtid_new = v_intersection_id -- and i.rtid in (1,8)
+                 and not exists(select * from graph_edges_all e2 
+                                where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1 
+                                  and v_subclass_id =e2.pid and i.classid = e2.rid2 and i.rtid = e2.rtid2);
+       drop table  tmp_inferred_sc_edges;
+       alter table tmp_inferred_sc_edges2 rename to tmp_inferred_sc_edges;
+     end if;
+            
+   end loop;
+   
+   v_result := true;
+
+   drop table tmp_inferred_sc_edges;   
+   return v_result;
+end;
+$$ language plpgsql;
