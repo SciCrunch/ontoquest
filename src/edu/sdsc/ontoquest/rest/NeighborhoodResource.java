@@ -27,7 +27,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 /**
- * @version $Id: NeighborhoodResource.java,v 1.4 2013-09-24 23:10:20 jic002 Exp $
+ * @version $Id: NeighborhoodResource.java,v 1.5 2013-10-14 06:31:29 jic002 Exp $
  *
  */
 public class NeighborhoodResource extends BaseResource {
@@ -85,7 +85,9 @@ public class NeighborhoodResource extends BaseResource {
         getAllSubClassGraph(inputStr, application.getKbId(), getOntoquestContext());
       } else if (type == NeighborType.PARTOF) { 
         getAllPartOfGraph(inputStr, application.getKbId(), getOntoquestContext());
-      } else if ( type == NeighborType.EDGE_RELATION) 
+      } else if ( type == NeighborType.HASPART) {
+        getAllHasPartGraph(inputStr, application.getKbId(), getOntoquestContext());
+      }  else if ( type == NeighborType.EDGE_RELATION) 
       {
         graph =  OntGraph.getAllEdges(inputStr, application.getKbId(), 
             inputType, getOntoquestContext());
@@ -108,6 +110,31 @@ public class NeighborhoodResource extends BaseResource {
     }
   }
   
+  private void getAllHasPartGraph(String term, int kbid, Context c) throws OntoquestException
+  {
+    Set<Relationship> edgeSet = new HashSet<Relationship> ();
+    
+    ResourceSet  rs = DbBasicFunctions.getInstance().searchHasPart( kbid, term, c);
+    while (rs.next()) {
+      String label1 = rs.getString(3);
+      if ( label1 == null)
+        throw new OntoquestException("label for " + rs.getInt(1) + "-" + rs.getInt(2) + " not found in graph_nodes_all") ;
+      String label2 = rs.getString(6);
+      if ( label2 == null)
+        throw new OntoquestException("label for " + rs.getInt(4) + "-" + rs.getInt(5) + " not found in graph_nodes_all") ;
+
+      Relationship e = new Relationship(rs.getInt(1), rs.getInt(2),
+          rs.getString(3), rs.getInt(4), rs.getInt(5), rs.getString(6),
+          rs.getInt(7), rs.getString(8), c);
+      if (!edgeSet.contains(e)) {
+        edgeSet.add(e);
+      }
+    }
+    rs.close();
+
+    graph = new OntGraph(edgeSet);
+  }
+
   private void getAllPartOfGraph(String term, int kbid, Context c) throws OntoquestException
   {
     Set<Relationship> edgeSet = new HashSet<Relationship> ();
@@ -132,7 +159,6 @@ public class NeighborhoodResource extends BaseResource {
 
     graph = new OntGraph(edgeSet);
   }
-
   
   private void getAllSubClassGraph(String term, int kbid, Context c) throws OntoquestException
   {
