@@ -78,9 +78,9 @@ create table graph_edges_all (
 ) with oids;
 
 -- create index on graph_edges
-CREATE INDEX edge_id1 ON graph_edges_all (rtid1, rid1, is_obsolete, kbid);
+CREATE INDEX edge_id1 ON graph_edges_all (rid1,rtid1, is_obsolete, kbid);
 
-CREATE INDEX edge_id2 ON graph_edges_all (rtid2, rid2, is_obsolete, kbid);
+CREATE INDEX edge_id2 ON graph_edges_all (rid2, rtid2, is_obsolete, kbid);
 
 CREATE INDEX edge_pid ON graph_edges_all (pid);
 
@@ -95,6 +95,208 @@ CREATE INDEX graph_edges_all_r1idx  ON graph_edges_all USING btree (rid1);
 CREATE INDEX graph_edges_rid2idx  ON graph_edges_all USING btree (rid2);
 
 
+-------------------------------------
+
+CREATE OR REPLACE FUNCTION compute_label_from_graph(theRid INTEGER, theRtid INTEGER) RETURNS TEXT AS $$
+/*
+  Set the label identified by (theRid, theRtid) in graph_nodes_all table.
+  @param theRid -- the rid of the node
+  @param theRtid -- the rtid of the node
+  @param isRecursive -- In some cases, the label of an anonymous class, e.g. union class, cannot be determined before
+                        the labels of its members are set. In such cases, if isRecursive is false, exit the function without
+                        setting the label and return false. Is isRecursive is true, set its memebers' label recursively and
+                        then set the label of the input node.
+  
+  Steps: 
+  1) First, check if the resource has a rdfs:label property. If so, use the value of rdfs:label as the resource's label. Return true.
+  2) Otherwise, check if the resource has a name. If so, use the name as label. Return true.
+  3) For anonymous classes, check if the resources used in class definition have labels or not. If yes, set the label depending on class type.
+  Return true. If not, decide if we need to set the labels of member classes, depending on the isRecursive flag.
+*/
+  DECLARE
+    rec RECORD;
+    theRid2 INTEGER;
+    theRtid2 INTEGER;
+    thePid INTEGER;
+    intVal INTEGER;
+    theLabel TEXT;
+    theLabel2 TEXT;
+  BEGIN
+    
+    select label into theLabel from graph_nodes all where rid = theRid and rtid = theRtid;
+    if theLabel is not null return theLabel end if;
+
+
+    IF theRtid = 10 THEN
+      select get_label(propertyid, 15), get_label(valueid, rtid) into theLabel, theLabel2 from hasvalue where id = theRid;
+      IF position(' ' IN theLabel) > 0 THEN
+        theLabel := '"'||theLabel||'"';
+      END IF;
+
+      IF position(' ' IN theLabel2) > 0 THEN
+        theLabel2 := '"'||theLabel2||'"';
+      END IF;
+
+      update graph_nodes_all set label = 'something with value of '||theLabel||' to be '||theLabel2 where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 7 THEN
+      select get_label(complementclassid, rtid) into theLabel2 from complementclass where id = theRid;
+  
+      IF theLabel2 is null OR length(theLabel2) <= 0 THEN
+        IF isRecursive THEN
+          select set_label(complementclassid, rtid, isRecursive) into theLabel2 from complementclass where id = theRid;
+        ELSE
+          return NULL;
+        END IF;
+      END IF;
+
+      update graph_nodes_all set label = 'not ('||theLabel2||')' where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 8 THEN
+      theLabel2 := 'intersection of (';
+      FOR rec IN select get_label(classid, rtid) as label from intersectionclass where id = theRid
+      LOOP
+        IF rec.label is null OR length(rec.label)  <= 0 THEN
+          IF isRecursive THEN
+            select set_label(classid, rtid, isRecursive) into theLabel from intersectionclass where id = theRid;
+          ELSE
+            return NULL;
+          END IF;
+        ELSE
+          theLabel := rec.label;
+        END IF;
+
+          IF position(',' in theLabel) > 0 THEN
+            theLabel2 := theLabel2||'"'||theLabel||'", ';
+          ELSE
+            theLabel2 := theLabel2||theLabel||', ';
+          END IF;
+      END LOOP;
+      theLabel2 := rtrim(theLabel2, ', ') ||')';
+      update graph_nodes_all set label = theLabel2 where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 9 THEN
+      theLabel2 := 'union of (';
+      FOR rec IN select get_label(classid, rtid) as label from unionclass where id = theRid
+      LOOP
+        IF rec.label is null OR length(rec.label)  <= 0 THEN
+          IF isRecursive THEN
+            select set_label(classid, rtid, isRecursive) into theLabel from unionclass where id = theRid;
+          ELSE
+            return NULL;
+          END IF;
+        ELSE
+          theLabel := rec.label;
+        END IF;
+
+          IF position(',' in theLabel) > 0 THEN
+            theLabel2 := theLabel2||'"'||theLabel||'", ';
+          ELSE
+            theLabel2 := theLabel2||theLabel||', ';
+          END IF;
+      END LOOP;
+      theLabel2 := rtrim(theLabel2, ', ') ||')';
+      update graph_nodes_all set label = theLabel2 where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 11 THEN
+      theLabel2 := 'one of (';
+      FOR rec IN select get_label(valueid, rtid) as label from oneof where id = theRid
+      LOOP
+        IF rec.label is null OR length(rec.label) <= 0 THEN
+          IF isRecursive THEN
+            select set_label(valueid, rtid, isRecursive) into theLabel from oneof where id = theRid;
+          ELSE
+            return NULL;
+          END IF;
+        ELSE
+          theLabel := rec.label;
+        END IF;
+
+        IF position(',' in theLabel) > 0 THEN
+          theLabel2 := theLabel2||'"'||theLabel||'", ';
+        ELSE
+          theLabel2 := theLabel2||theLabel||', ';
+        END IF;
+      END LOOP;
+      theLabel2 := rtrim(theLabel2, ', ') ||')';
+      update graph_nodes_all set label = theLabel2 where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 16 THEN
+      update graph_nodes_all set label = substring(name, 5) where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 17 THEN
+      update graph_nodes_all set label = (select distinct browsertext from alldifferentindividual where id = theRid)
+        where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 2 THEN
+      select get_label(rangeclassid, rtid), get_label(propertyid, 15) into theLabel2, theLabel from allvaluesfromclass where id = theRid;
+      IF theLabel2 is null OR length(theLabel2) <= 0 THEN
+        IF isRecursive THEN
+            select set_label(rangeclassid, rtid, isRecursive) into theLabel2 from allvaluesfromclass where id = theRid;
+        ELSE
+          return NULL;
+        END IF;
+      END IF;
+
+      IF position(' ' IN theLabel2) > 0 THEN
+        theLabel2 := '"'||theLabel2||'"';
+      END IF;
+
+      IF position(' ' IN theLabel) > 0 THEN
+        theLabel := '"'||theLabel||'"';
+      END IF;
+
+      update graph_nodes_all set label = 'something [forall]'||theLabel||' '||theLabel2 where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    IF theRtid = 3 THEN
+      select get_label(rangeclassid, rtid), get_label(propertyid, 15) into theLabel2, theLabel from somevaluesfromclass where id = theRid;
+      IF theLabel2 is null OR length(theLabel2) <= 0 THEN
+        IF isRecursive THEN
+            select set_label(rangeclassid, rtid, isRecursive) into theLabel2 from somevaluesfromclass where id = theRid;
+        ELSE
+          return NULL;
+        END IF;
+      END IF;
+
+      IF position(' ' IN theLabel2) > 0 THEN
+        theLabel2 := '"'||theLabel2||'"';
+      END IF;
+
+      IF position(' ' IN theLabel) > 0 THEN
+        theLabel := '"'||theLabel||'"';
+      END IF;
+
+      update graph_nodes_all set label = 'something [exists]'||theLabel||' '||theLabel2 where rid = theRid and rtid = theRtid RETURNING label INTO theLabel;
+      return theLabel;
+    END IF;
+
+    return NULL;
+  END;
+$$ LANGUAGE plpgsql;
+
+
+
+
+
+
+
+-------------------------------------
 
 CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursive BOOLEAN) RETURNS TEXT AS $$
 /*
@@ -137,7 +339,7 @@ CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursiv
       return theLabel;
     END IF;
 
-    IF theRtid = 4 THEN
+    IF theRtid = 4 THEN  -- cardinalityclass
       select get_label(propertyid, 15), cardinality into theLabel, intVal from cardinalityclass where id = theRid;
       IF position(' ' IN theLabel) > 0 THEN
         theLabel := '"'||theLabel||'"';
@@ -147,7 +349,7 @@ CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursiv
       return theLabel;
     END IF;
 
-    IF theRtid = 5 THEN
+    IF theRtid = 5 THEN   -- mincardinalityclass
       select get_label(propertyid, 15), mincardinality into theLabel, intVal from mincardinalityclass where id = theRid;
       IF position(' ' IN theLabel) > 0 THEN
         theLabel := '"'||theLabel||'"';
@@ -1446,5 +1648,145 @@ begin
 
    drop table tmp_inferred_sc_edges;   
    return v_result;
+end;
+$$ language plpgsql;
+
+
+create or replace function get_subproperty_id_str (theKbid integer, pid integer)
+returns text as $$
+begin
+  if not exists (select 1 from property where id = pid)
+  then
+    raise 'Property id % not found in property table.', pid;
+  end if;
+  
+   return array_to_string(array(
+( with recursive include_subproperty (childid, parentid) as (
+       select childid, parentid from subpropertyof where parentid = pid and kbid = theKbid
+  union 
+    select p.childid, p.parentid 
+    from include_subproperty sp, subpropertyof p
+    where p.parentid = sp.childid
+   )
+select ss.childid from include_subproperty ss)
+  )||pid, ',');
+     
+end;
+$$ language plpgsql;
+
+
+create or replace function get_subproperty_id_str (theKbid integer, pid integer)
+returns text as $$
+begin
+  if not exists (select 1 from property where id = pid)
+  then
+    raise 'Property id % not found in property table.', pid;
+  end if;
+  
+   return array_to_string(array(
+( with recursive include_subproperty (childid, parentid) as (
+       select childid, parentid from subpropertyof where parentid = pid and kbid = theKbid
+  union 
+    select p.childid, p.parentid 
+    from include_subproperty sp, subpropertyof p
+    where p.parentid = sp.childid
+   )
+select ss.childid from include_subproperty ss)
+  )||pid, ',');
+     
+end;
+$$ language plpgsql;
+
+create or replace function infer_inheritable_property_on_class (theKbid integer, property_id integer)
+returns bigint as $$
+declare 
+   v_subclass_id integer;
+   v_updated integer ;
+   pid_condition text := '';
+   v_total_cnt bigint :=0;
+begin
+   select id into v_subclass_id from property where name = 'subClassOf' and kbid = theKbid;
+
+    pid_condition = get_subproperty_id_str (theKbid, property_id);
+
+   raise notice 'pid list is (%).', pid_condition;  
+   
+   -- process subclassof
+  --   drop table if exists tmp_inferred_new_edges;
+   create temp table tmp_inferred_new_edges
+      (rid1 bigint, rtid1 bigint, rid2 bigint, rtid2 integer, rid_new bigint, rtid_new bigint, pid integer);
+   
+   insert into tmp_inferred_new_edges (rid1, rtid1, rid2, rtid2, rid_new, rtid_new, pid)
+   select e.rid1, e.rtid1, e.rid2, e.rtid2, e1.rid2, e1.rtid2, e1.pid
+   from graph_edges_all e, 
+     graph_edges_all e1,
+    (  select  property_id as id
+      union 
+      ( with recursive include_subproperty (childid, parentid) as (
+           select childid, parentid from subpropertyof where parentid =  property_id
+          union 
+           select p.childid, p.parentid 
+           from include_subproperty sp, subpropertyof p
+           where p.parentid = sp.childid
+        )
+        select ss.childid from include_subproperty ss) ) f
+        where e.pid =v_subclass_id and e.rid2 = e1.rid1 and e.rtid2= e1.rtid1 and e1.pid =f.id
+        and e.kbid =theKbid  and not exists(select 1 from graph_edges_all e2,
+                              ( select e1.pid as id
+                                union 
+                                 ( with recursive include_subproperty (childid, parentid) as (
+                                    select childid, parentid from subpropertyof where parentid = e1.pid
+                                   union 
+                                    select p.childid, p.parentid 
+                                    from include_subproperty sp, subpropertyof p
+                                    where p.parentid = sp.childid
+                                   )
+                                   select ss.childid from include_subproperty ss) ) f2
+                              where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1
+                                and f2.id =e2.pid and e1.rid2 = e2.rid2 and e1.rtid2 = e2.rtid2);  
+                                
+    
+  
+   loop
+     v_updated := count(*) from tmp_inferred_new_edges;
+     raise notice '% new edges are generated.', v_updated;                              
+     v_total_cnt := v_total_cnt + v_updated;
+     
+     if v_updated = 0 then 
+       exit;    -- exit loop
+     else 
+       insert into graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden)
+       select  t.rid1, rtid1, pid, t.rid_new, t.rtid_new, theKbid, true, false 
+       from tmp_inferred_new_edges t ;
+
+       create temp table tmp_inferred_new_edges2 
+         (rid1 bigint, rtid1 bigint, rid2 bigint, rtid2 integer, rid_new bigint, rtid_new bigint, pid integer);
+       
+       insert into tmp_inferred_new_edges2(rid1, rtid1, rid2, rtid2, rid_new, rtid_new, pid)
+        select e.rid1, e.rtid1, e.rid2, e.rtid2, t.rid_new, t.rtid_new, t.pid
+        from graph_edges_all e, tmp_inferred_new_edges t
+        where e.pid =v_subclass_id and e.kbid =theKbid and e.rid2 = t.rid1 and e.rtid2= t.rtid1 
+           and not exists(select 1 from graph_edges_all e2,
+                              ( select t.pid as id
+                                union 
+                                 ( with recursive include_subproperty (childid, parentid) as (
+                                    select childid, parentid from subpropertyof where parentid = t.pid
+                                   union 
+                                    select p.childid, p.parentid 
+                                    from include_subproperty sp, subpropertyof p
+                                    where p.parentid = sp.childid
+                                   )
+                                   select ss.childid from include_subproperty ss) ) f2
+                              where e.rid1 = e2.rid1 and e.rtid1 = e2.rtid1
+                                and f2.id =e2.pid and t.rid_new = e2.rid2 and t.rtid_new = e2.rtid2);  
+
+       drop table  tmp_inferred_new_edges;
+       alter table tmp_inferred_new_edges2 rename to tmp_inferred_new_edges;
+     end if;
+            
+   end loop;
+   
+   drop table tmp_inferred_new_edges;   
+   return v_total_cnt;
 end;
 $$ language plpgsql;
