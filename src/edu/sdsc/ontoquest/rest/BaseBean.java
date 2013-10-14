@@ -11,7 +11,7 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: BaseBean.java,v 1.7 2013-09-24 23:14:37 jic002 Exp $
+ * @version $Id: BaseBean.java,v 1.8 2013-10-14 06:30:20 jic002 Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
  * 
@@ -20,7 +20,7 @@ public abstract class BaseBean {
 	public enum InputType { OID, NAME, TERM, ID }
   
   // added ALLSUBCLASSES to use new function and search fat nodes.
-	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL,EDGE_RELATION,ALLSUBCLASSES,PARTOF }
+	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL,EDGE_RELATION,ALLSUBCLASSES,PARTOF,HASPART }
 
 	public enum SiblingsType { CLASSES, PARTS }
 
