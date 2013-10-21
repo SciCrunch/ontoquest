@@ -745,6 +745,79 @@ CREATE OR REPLACE FUNCTION update_inference_edges2(theKbid integer)
 $$ LANGUAGE plpgsql;
 
 
+CREATE OR REPLACE FUNCTION move_equivalent_class_edges(thekbid integer)
+  RETURNS void AS
+$BODY$
+DECLARE
+    rep_id integer;
+    member_id integer;
+    class_rtid integer;
+    total_cnt integer :=0;
+    i_cnt integer ;
+    o_cnt integer ;
+    i_del_cnt integer;
+    o_del_cnt integer;
+    eq_pid integer;
+BEGIN
+    
+    select id into class_rtid from resourcetype where name = 'primitiveclass';
+    select id into eq_pid from property where name='equivalentClass' and kbid= thekbid;
+    
+    FOR rep_id, member_id in SELECT e.rid, e.ridm from equivalentclassgroup e where e.kbid = thekbid
+    LOOP
+
+      delete from graph_edges_all ge
+      where ge.rid1 = member_id and ge.kbid = thekbid and ge.rtid1=class_rtid and ge.pid <> eq_pid and
+         exists ( select 1 from graph_edges_all gei 
+                  where gei.rid1=rep_id and gei.rtid1=class_rtid 
+                        and gei.rid2=ge.rid2 and gei.rtid2 = ge.rtid2 and ge.pid = gei.pid);
+
+      get diagnostics o_del_cnt = ROW_COUNT;  
+
+      delete from graph_edges_all ge
+      where ge.rid2 = member_id and ge.kbid = thekbid and ge.rtid2=class_rtid and ge.pid <> eq_pid and
+         exists ( select 1 from graph_edges_all gei 
+                  where gei.rid2=rep_id and gei.rtid2=class_rtid 
+                        and gei.rid1=ge.rid1 and gei.rtid1 = ge.rtid1 and ge.pid = gei.pid);
+
+      get diagnostics i_del_cnt = ROW_COUNT;  
+
+
+      -- move edges member -> node to rep -> node
+      update graph_edges_all ge
+              set rid1 = rep_id
+      where ge.rid1 = member_id and ge.rtid1=class_rtid and ge.kbid = thekbid and ge.pid <> eq_pid and
+         not exists ( select 1 from graph_edges_all gei 
+                      where gei.rid1=rep_id and gei.rtid1=class_rtid 
+                            and gei.rid2=ge.rid2 and gei.rtid2 = ge.rtid2 and ge.pid = gei.pid);
+
+      get diagnostics o_cnt = ROW_COUNT;
+
+      -- move edges nodeX -> member  to nodeX -> rep  
+      update graph_edges_all ge
+              set rid2 = rep_id
+      where ge.rid2 = member_id and ge.rtid2=class_rtid and ge.kbid = thekbid and ge.pid <> eq_pid and
+         not exists ( select 1 from graph_edges_all gei 
+                      where gei.rid2=rep_id and gei.rtid2=class_rtid 
+                            and gei.rid1=ge.rid1 and gei.rtid1 = ge.rtid1 and ge.pid = gei.pid);
+
+      get diagnostics i_cnt = ROW_COUNT;        
+
+      total_cnt := total_cnt + i_del_cnt + o_del_cnt + i_cnt + o_cnt;
+      raise notice 'REP:%, member:%. % in and % out edges are deleted. % in and % out edges are moved.',
+          rep_id, member_id, i_del_cnt, o_del_cnt, i_cnt, o_cnt;
+                           
+    END LOOP;
+
+    RAISE NOTICE 'Done updating equivalent edges. Total % edges are updated.', total_cnt;
+    
+END;
+$BODY$
+  LANGUAGE plpgsql;
+
+
+
+
 CREATE OR REPLACE FUNCTION update_equivalent_class_group(thekbid integer)
   RETURNS void AS
 $BODY$
@@ -778,17 +851,9 @@ BEGIN
 
             insert into equivalentclassgroup (rid, ridm, kbid) values
               (mvrec.classid2, mvrec.classid1, thekbid);
-
-            update graph_edges_all ge
-              set rid1 = mvrec.classid2
-            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid;
-             
          else 
             insert into equivalentclassgroup (rid, ridm, kbid) values
               (mvrec.classid1, mvrec.classid2, thekbid);
-            update graph_edges_all ge
-              set rid1 = mvrec.classid1
-            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1=class_rtid;
          end if;
       elsif exists ( select 1 from equivalentclassgroup c where c.rid = mvrec.classid2)
       then
@@ -803,14 +868,8 @@ BEGIN
             where rid = mvrec.classid2;
 
             insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid1, mvrec.classid2, thekbid);
-            update graph_edges_all ge 
-            set rid1 = mvrec.classid1
-            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1=class_rtid;
          else 
             insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2, mvrec.classid1, thekbid);
-            update graph_edges_all ge
-              set rid1 = mvrec.classid2
-            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid;
          end if;
       elsif exists ( select 1 from equivalentclassgroup c where c.ridm = mvrec.classid2)
       then
@@ -824,14 +883,8 @@ BEGIN
                set rid = mvrec.classid1
             where rid = rep_id;
             insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid1, rep_id, thekbid);
-            update graph_edges_all ge
-              set rid1 = mvrec.classid1
-            where ge.rid1 = rep_id and ge.kbid = thekbid and ge.rtid1=class_rtid; 
          else
             insert into equivalentclassgroup (rid, ridm, kbid) values (rep_id, mvrec.classid1, thekbid);
-            update graph_edges_all ge
-              set rid1 = rep_id
-            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid; 
          end if;
       elsif exists ( select 1 from equivalentclassgroup c where c.ridm = mvrec.classid1)
       then
@@ -846,15 +899,9 @@ BEGIN
             where rid = rep_id;
 
             insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2, rep_id, thekbid);
-            update graph_edges_all ge
-               set rid1 = mvrec.classid2
-            where ge.rid1 = rep_id and ge.kbid = thekbid and ge.rtid1=class_rtid;
          else 
             insert into equivalentclassgroup (rid, ridm, kbid) values
                (rep_id, mvrec.classid2, thekbid);
-            update graph_edges_all ge
-               set rid1 = rep_id
-            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1=class_rtid;
          end if;
       else 
          RAISE NOTICE '% and % are not in any group, creating new group.', mvrec.classid1,mvrec.classid2;
@@ -863,26 +910,20 @@ BEGIN
             and not (select is_obsolete from graph_nodes_all where rid = mvrec.classid2 and rtid=class_rtid)
          then    
 	    insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2,mvrec.classid1, thekbid);
-            update graph_edges_all ge
-               set rid1 = mvrec.classid2
-            where ge.rid1 = mvrec.classid1 and ge.kbid = thekbid and ge.rtid1=class_rtid;
          else
             insert into equivalentclassgroup (rid, ridm, kbid) values
                (mvrec.classid1, mvrec.classid2, thekbid);
-            update graph_edges_all ge
-               set rid1 = mvrec.classid1
-            where ge.rid1 = mvrec.classid2 and ge.kbid = thekbid and ge.rtid1 = class_rtid;
          end if;
       end if; 
     END LOOP;
+
+    select move_equivalent_class_edges(thekbid;
 
     RAISE NOTICE 'Done merging equivalent classes.';
     
 END;
 $BODY$
   LANGUAGE plpgsql;
-
-
 /*
   Transform an owl knowledge base to a graph easy to view. Node table as 6 columns: rid, rtid, name, label, kbid, is_anonymous.
   Node name is class name, e.g. sao1065676773. Node label is the value of rdfs:label, e.g. hippocampus.
@@ -1854,8 +1895,8 @@ $BODY$
       )
       select ie.rid1, ie.rtid1,n1.label as name1, ie.rid2, ie.rtid2,
         n2.label as name2, ie.pid, p0.name as pname  from incoming_enclosure ie, graph_nodes n1, graph_nodes n2, property p0
-      where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id order by ie.depth
-       
+      where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id 
+          order by ie.depth, ie.rid2, ie.rid1
       LOOP
          return next rec;
 
@@ -1892,8 +1933,8 @@ $BODY$
       )
       select ie.rid1, ie.rtid1,n1.label as name1, ie.rid2, ie.rtid2,
         n2.label as name2, ie.pid, p0.name as pname  from incoming_enclosure ie, graph_nodes n1, graph_nodes n2, property p0
-      where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id order by ie.depth
-       
+      where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id 
+         order by ie.depth, ie.rid1, ie.rid2
       LOOP
          return next rec;
 
@@ -1918,4 +1959,4 @@ END;
 $BODY$
   LANGUAGE plpgsql
   COST 100
-  ROWS 1000;
+  ROWS 2000;
