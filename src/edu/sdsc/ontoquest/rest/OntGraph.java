@@ -25,8 +25,10 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import java.util.Collection;
+
 /**
- * @version $Id: OntGraph.java,v 1.6 2013-09-24 23:11:06 jic002 Exp $
+ * @version $Id: OntGraph.java,v 1.7 2013-10-22 19:35:03 jic002 Exp $
  *
  */
 public class OntGraph extends BaseBean {
@@ -256,10 +258,10 @@ public class OntGraph extends BaseBean {
 	}
 
 	//  private Set<ClassNode> nodes;
-	private Set<Relationship> edges;
+	private Collection<Relationship> edges;
 
 
-	public OntGraph(Set<Relationship> edges) {
+	public OntGraph(Collection<Relationship> edges) {
 		this.edges = edges;
 	}
 
@@ -273,7 +275,7 @@ public class OntGraph extends BaseBean {
 	/**
 	 * @return the edges
 	 */
-	public Set<Relationship> getEdges() {
+	public Collection<Relationship> getEdges() {
 		return edges;
 	}
 
