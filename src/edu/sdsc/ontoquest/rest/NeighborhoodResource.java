@@ -1,5 +1,7 @@
 package edu.sdsc.ontoquest.rest;
 
+import edu.sdsc.ontoquest.BasicFunctions;
+
 import java.util.Map;
 
 import org.restlet.data.Form;
@@ -22,12 +24,13 @@ import edu.sdsc.ontoquest.ResourceSet;
 
 import edu.sdsc.ontoquest.db.DbBasicFunctions;
 
+import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 
 /**
- * @version $Id: NeighborhoodResource.java,v 1.5 2013-10-14 06:31:29 jic002 Exp $
+ * @version $Id: NeighborhoodResource.java,v 1.6 2013-10-22 19:34:06 jic002 Exp $
  *
  */
 public class NeighborhoodResource extends BaseResource {
@@ -39,12 +42,29 @@ public class NeighborhoodResource extends BaseResource {
   protected void doInit() throws ResourceException {
     String typeVal = null;
     OntoquestApplication application = (OntoquestApplication)getApplication();
+    int kbId = application.getKbId();  // default kb id
     try {
       // extract optional parameters
       Form form = getRequest().getResourceRef().getQueryAsForm();
       for (String key : form.getValuesMap().keySet()) {
         getRequest().getAttributes().put(key, form.getFirstValue(key));
       }
+      
+      String kbName = form.getFirstValue("ontology");
+      if (kbName != null && kbName.length() > 0) {
+        BasicFunctions basicFunctions = DbBasicFunctions.getInstance();
+        kbId = basicFunctions.getKnowledgeBaseID(kbName, getOntoquestContext());
+      }
+
+      boolean includingEquivalentClass = false;
+      String includeEqClass = form.getFirstValue("equivalentclass");
+      if (includeEqClass  != null) {
+        if (includeEqClass.equalsIgnoreCase("true"))
+          includingEquivalentClass=true;
+        else if ( ! includeEqClass.equalsIgnoreCase("false"))
+          throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid value for parameter 'equivalentclass'. Supported values are 'true' and 'false'.");
+      }
+
       
       typeVal = (String) getRequest().getAttributes().get("type");
       this.type = null;
@@ -82,18 +102,34 @@ public class NeighborhoodResource extends BaseResource {
       long t1 = Calendar.getInstance().getTimeInMillis();
       if ( type == NeighborType.ALLSUBCLASSES) 
       {
-        getAllSubClassGraph(inputStr, application.getKbId(), getOntoquestContext());
-      } else if (type == NeighborType.PARTOF) { 
-        getAllPartOfGraph(inputStr, application.getKbId(), getOntoquestContext());
-      } else if ( type == NeighborType.HASPART) {
-        getAllHasPartGraph(inputStr, application.getKbId(), getOntoquestContext());
-      }  else if ( type == NeighborType.EDGE_RELATION) 
+        getAllSubClassGraph(inputStr, kbId, getOntoquestContext(),includingEquivalentClass);
+      } else if (type == NeighborType.ALLPARTSOF) { 
+        getAllPartOfGraph(inputStr, kbId, getOntoquestContext(),includingEquivalentClass);
+      } else if ( type == NeighborType.ALLHASPARTS) {
+        getAllHasPartGraph(inputStr, kbId, getOntoquestContext(),includingEquivalentClass);
+      } else if (type == NeighborType.ENCLOSURE) { 
+
+        String propertyName = form.getFirstValue("property");
+        if (propertyName == null) {
+            throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Parameter 'property' needs to be specified in URL.");
+        }
+
+        boolean incoming = true;
+        String directionStr = form.getFirstValue("direction");
+        if (directionStr != null) {
+          if (directionStr.equalsIgnoreCase("outgoing"))
+            incoming=false;
+          else if ( ! directionStr.equalsIgnoreCase("incoming"))
+            throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid value for parameter 'direction'. Supported values are 'outgoing' and 'incoming'.");
+        }
+        
+        
+        getEnclosureGraph(inputStr, kbId, getOntoquestContext(), propertyName, incoming,includingEquivalentClass);
+      } else if ( type == NeighborType.EDGE_RELATION) 
       {
-        graph =  OntGraph.getAllEdges(inputStr, application.getKbId(), 
-            inputType, getOntoquestContext());
+        graph = OntGraph.getAllEdges(inputStr, kbId,inputType, getOntoquestContext());
       } else {
-        graph = OntGraph.get(inputStr, type, application.getKbId(), 
-            attributes, inputType, getOntoquestContext());
+        graph = OntGraph.get(inputStr, type, kbId,attributes, inputType, getOntoquestContext());
       }
       long t2 = Calendar.getInstance().getTimeInMillis();
       
@@ -109,12 +145,14 @@ public class NeighborhoodResource extends BaseResource {
 //      throw new ResourceException(Status.SERVER_ERROR_INTERNAL, oe.getMessage(), oe);
     }
   }
-  
-  private void getAllHasPartGraph(String term, int kbid, Context c) throws OntoquestException
+
+
+  private void getEnclosureGraph(String term, int kbid, Context c, 
+                                 String propertyName, boolean incoming, boolean includingEquivalentClass) throws OntoquestException
   {
-    Set<Relationship> edgeSet = new HashSet<Relationship> ();
+    Collection<Relationship> edgeSet = new LinkedHashSet<Relationship> (500);
     
-    ResourceSet  rs = DbBasicFunctions.getInstance().searchHasPart( kbid, term, c);
+    ResourceSet  rs = DbBasicFunctions.getInstance().searchEnclosure( kbid, term, c, propertyName, incoming,includingEquivalentClass);
     while (rs.next()) {
       String label1 = rs.getString(3);
       if ( label1 == null)
@@ -135,11 +173,37 @@ public class NeighborhoodResource extends BaseResource {
     graph = new OntGraph(edgeSet);
   }
 
-  private void getAllPartOfGraph(String term, int kbid, Context c) throws OntoquestException
+  
+  private void getAllHasPartGraph(String term, int kbid, Context c, boolean includingEquivalentClass) throws OntoquestException
   {
-    Set<Relationship> edgeSet = new HashSet<Relationship> ();
+    Collection<Relationship> edgeSet = new LinkedHashSet<Relationship> (500);
     
-    ResourceSet  rs = DbBasicFunctions.getInstance().searchpartOf( kbid, term, c);
+    ResourceSet  rs = DbBasicFunctions.getInstance().searchHasPart( kbid, term, c,includingEquivalentClass);
+    while (rs.next()) {
+      String label1 = rs.getString(3);
+      if ( label1 == null)
+        throw new OntoquestException("label for " + rs.getInt(1) + "-" + rs.getInt(2) + " not found in graph_nodes_all") ;
+      String label2 = rs.getString(6);
+      if ( label2 == null)
+        throw new OntoquestException("label for " + rs.getInt(4) + "-" + rs.getInt(5) + " not found in graph_nodes_all") ;
+
+      Relationship e = new Relationship(rs.getInt(1), rs.getInt(2),
+          rs.getString(3), rs.getInt(4), rs.getInt(5), rs.getString(6),
+          rs.getInt(7), rs.getString(8), c);
+      if (!edgeSet.contains(e)) {
+        edgeSet.add(e);
+      }
+    }
+    rs.close();
+
+    graph = new OntGraph(edgeSet);
+  }
+
+  private void getAllPartOfGraph(String term, int kbid, Context c, boolean includingEquivalentClass) throws OntoquestException
+  {
+    Collection<Relationship> edgeSet = new LinkedHashSet<Relationship> (500);
+    
+    ResourceSet  rs = DbBasicFunctions.getInstance().searchpartOf( kbid, term, c,includingEquivalentClass);
     while (rs.next()) {
       String label1 = rs.getString(3);
       if ( label1 == null)
@@ -160,11 +224,11 @@ public class NeighborhoodResource extends BaseResource {
     graph = new OntGraph(edgeSet);
   }
   
-  private void getAllSubClassGraph(String term, int kbid, Context c) throws OntoquestException
+  private void getAllSubClassGraph(String term, int kbid, Context c, boolean includingEquivalentClass) throws OntoquestException
   {
-    Set<Relationship> edgeSet = new HashSet<Relationship> ();
+    Collection<Relationship> edgeSet = new ArrayList<Relationship> (500);
     
-    ResourceSet  rs = DbBasicFunctions.getInstance().searchSubclasses( kbid, term, c);
+    ResourceSet  rs = DbBasicFunctions.getInstance().searchSubclasses( kbid, term, c,includingEquivalentClass);
     while (rs.next()) {
       String label1 = rs.getString(3);
       if ( label1 == null)
