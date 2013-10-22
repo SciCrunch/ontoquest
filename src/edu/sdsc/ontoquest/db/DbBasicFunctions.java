@@ -28,7 +28,7 @@ import java.sql.SQLException;
 //import org.jgrapht.graph.DefaultDirectedGraph;
 
 /**
- * @version $Id: DbBasicFunctions.java,v 1.5 2013-10-14 06:32:27 jic002 Exp $
+ * @version $Id: DbBasicFunctions.java,v 1.6 2013-10-22 19:30:51 jic002 Exp $
  *
  */
 public class DbBasicFunctions implements BasicFunctions {
@@ -549,26 +549,41 @@ public class DbBasicFunctions implements BasicFunctions {
     return sb.toString();
   }
 
-  public ResourceSet searchSubclasses ( int kbid, String term_id, Context context) throws OntoquestException
+  public ResourceSet searchSubclasses ( int kbid, String term_id, Context context,boolean includingEquivalentClass) throws OntoquestException
   {
-    String sql = "select * from get_incoming_enclosure_by_term_id('"+term_id+"','subClassOf',"+kbid+")";
+    String sql = "select * from get_enclosure_by_term_id('"+term_id+"','subClassOf',"+kbid+",true,"+
+                   includingEquivalentClass +")";
     String errmsg = "";
     return DbUtility.executeSQLQuery( sql, context, BaseBean.getVarList8(), null, errmsg);
   }
 
-  public ResourceSet searchHasPart ( int kbid, String term_id, Context context) throws OntoquestException
+  public ResourceSet searchHasPart ( int kbid, String term_id, Context context,boolean includingEquivalentClass) throws OntoquestException
   {
-    String sql = "select * from get_outgoing_enclosure_by_term_id('"+term_id+"','part_of',"+kbid+")";
+    String sql = "select * from get_enclosure_by_term_id('"+term_id+"','part_of',"+kbid+",false,"+
+                   includingEquivalentClass +")";
     String errmsg = "";
     return DbUtility.executeSQLQuery( sql, context, BaseBean.getVarList8(), null, errmsg);
   }
 
-  public ResourceSet searchpartOf ( int kbid, String term_id, Context context) throws OntoquestException
+  public ResourceSet searchpartOf ( int kbid, String term_id, Context context,boolean includingEquivalentClass) throws OntoquestException
   {
-    String sql = "select * from get_incoming_enclosure_by_term_id('"+term_id+"','part_of',"+kbid+")";
+    String sql = "select * from get_enclosure_by_term_id('"+term_id+"','part_of',"+kbid+",true,"+
+                   includingEquivalentClass +")";
     String errmsg = "";
     return DbUtility.executeSQLQuery( sql, context, BaseBean.getVarList8(), null, errmsg);
   }
+
+
+  public ResourceSet searchEnclosure ( int kbid, String term_id, Context context,
+                                      String propertyName, boolean incoming, boolean includingEquivalentClass)
+             throws OntoquestException
+  {
+    String sql = "select * from get_enclosure_by_term_id('"+term_id+"','" + propertyName + "',"+kbid+","+ incoming+ 
+                  "," + includingEquivalentClass+ ")";
+    String errmsg = "";
+    return DbUtility.executeSQLQuery( sql, context, BaseBean.getVarList8(), null, errmsg);
+  }
+
 
   /*
   public void  addDesendantsToGraph(int kbid, int rid, int rtid, int propId,
