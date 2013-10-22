@@ -8,7 +8,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 /**
- * @version $Id: Relationship.java,v 1.4 2013-09-24 23:12:16 jic002 Exp $
+ * @version $Id: Relationship.java,v 1.5 2013-10-22 19:36:17 jic002 Exp $
  *
  */
 public class Relationship extends BaseBean {
@@ -23,6 +23,10 @@ public class Relationship extends BaseBean {
   private Context context;
   
   private static final int DEFAULT_PROPERTY_RTID = 15;
+  
+  // PRIVATE 
+  private static final int fODD_PRIME_NUMBER = 37;
+
   
   public Relationship(int rid1, int rtid1, String label1, int rid2, int rtid2, String label2, int pid, String pname, Context context) {
     this.rid1 = rid1;
@@ -98,9 +102,15 @@ public class Relationship extends BaseBean {
     
     Relationship r = (Relationship)o;
     
-    return r.getRid1()==getRid1() && r.getRid2()==getRid2() 
-      && r.getRtid1()==getRtid1() && r.getRtid2()==getRtid2()
-      && r.getPid()==getPid();
+    return r.getRid1()==rid1 && r.getRid2()==rid2
+      && r.getRtid1()==rtid1 && r.getRtid2()==rtid2
+      && r.getPid()==pid;
+  }
+  
+  public int hashCode() 
+  {
+    return (((rid1+fODD_PRIME_NUMBER)*fODD_PRIME_NUMBER+ rid2)*fODD_PRIME_NUMBER + pid)*fODD_PRIME_NUMBER + rtid1;
+    
   }
 
   /* (non-Javadoc)
