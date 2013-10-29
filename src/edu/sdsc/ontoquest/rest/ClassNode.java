@@ -25,7 +25,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 /**
- * @version $Id: ClassNode.java,v 1.5 2013-09-24 23:15:40 jic002 Exp $
+ * @version $Id: ClassNode.java,v 1.6 2013-10-29 23:52:45 jic002 Exp $
  *
  */
 public class ClassNode extends BaseBean {
@@ -111,14 +111,16 @@ public class ClassNode extends BaseBean {
 				//        String nifID = nameMap.get(generateId(rid, rtid));
 				//        if (nifID == null) 
 				//          nifID = getBasicFunctions().getName(rtid, rid, context);
-				node = new ClassNode(compositeID, null, term, new LinkedList<String>(), new LinkedList<String>());
+				node = new ClassNode(compositeID, null, term, new LinkedList<String>(), new LinkedList<String>(), null);
 				nodeIDList.add(new int[]{rid, rtid});
 			}
 
 			if (getDefinitionPropertySet().contains(prop)) { // a definition edge
 				List<String> comments = node.getComments();
 				comments.add(val+" ["+rs.getString(8)+"]");
-			} else if (getLabelPropertySet().contains(prop)) { // a label edge
+      } else if (prop.equals(definitionProperty)) {
+         node.setDefinition(val);
+      } else if (getLabelPropertySet().contains(prop)) { // a label edge
 				if (!useLabel)
 					node.setLabel(rs.getString(6));
 			} else if (getSynonymPropertySet().contains(prop)){ // synonym edge
@@ -370,6 +372,8 @@ public class ClassNode extends BaseBean {
 	private int rtid;
 	private String label; // rdfs:label
 	private String name; // class name, e.g. birnlex_802
+  
+  private String definition;
 
 	private String url; // ontology url
 
@@ -441,13 +445,14 @@ public class ClassNode extends BaseBean {
 	}
 
 	public ClassNode(String id, String name, String label, List<String> comments, 
-			List<String> synonyms) throws OntoquestException {
+			List<String> synonyms,String definition) throws OntoquestException {
 		setId(id);
 		setLabel(label);
 		setName(name);
 		setComments(comments);
 		setSynonyms(synonyms);
 		otherProperties = new LinkedList<String[]>();
+    this.definition = definition;
 	}
 
 	@Override
@@ -522,6 +527,16 @@ public class ClassNode extends BaseBean {
 	public String getUrl() {
 		return url;
 	}
+  
+  public String getDefinition() 
+  {
+    return definition;
+  }
+  
+  public void setDefinition(String def) 
+  {
+    definition = def;
+  }
 
 	/**
 	 * @param comments the comments to set
@@ -611,6 +626,12 @@ public class ClassNode extends BaseBean {
 		e.appendChild(urlElem);
 		if (getUrl() != null)
 			urlElem.appendChild(doc.createTextNode(getUrl()));
+    
+	  Element definitionElem = doc.createElement("definition");
+	  e.appendChild(definitionElem);
+	  if (getDefinition() != null)
+	    definitionElem.appendChild(doc.createTextNode(getDefinition()));
+    
 
 		if (!Utility.isBlank(comments)) {
 			Element commentsElem = doc.createElement("comments");
