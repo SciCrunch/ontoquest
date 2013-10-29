@@ -30,7 +30,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 
 /**
- * @version $Id: NeighborhoodResource.java,v 1.6 2013-10-22 19:34:06 jic002 Exp $
+ * @version $Id: NeighborhoodResource.java,v 1.7 2013-10-29 23:54:56 jic002 Exp $
  *
  */
 public class NeighborhoodResource extends BaseResource {
@@ -107,7 +107,7 @@ public class NeighborhoodResource extends BaseResource {
         getAllPartOfGraph(inputStr, kbId, getOntoquestContext(),includingEquivalentClass);
       } else if ( type == NeighborType.ALLHASPARTS) {
         getAllHasPartGraph(inputStr, kbId, getOntoquestContext(),includingEquivalentClass);
-      } else if (type == NeighborType.ENCLOSURE) { 
+      } else if (type == NeighborType.CLOSURE) { 
 
         String propertyName = form.getFirstValue("property");
         if (propertyName == null) {
@@ -124,7 +124,7 @@ public class NeighborhoodResource extends BaseResource {
         }
         
         
-        getEnclosureGraph(inputStr, kbId, getOntoquestContext(), propertyName, incoming,includingEquivalentClass);
+        getClosureGraph(inputStr, kbId, getOntoquestContext(), propertyName, incoming,includingEquivalentClass);
       } else if ( type == NeighborType.EDGE_RELATION) 
       {
         graph = OntGraph.getAllEdges(inputStr, kbId,inputType, getOntoquestContext());
@@ -147,12 +147,12 @@ public class NeighborhoodResource extends BaseResource {
   }
 
 
-  private void getEnclosureGraph(String term, int kbid, Context c, 
+  private void getClosureGraph(String term, int kbid, Context c, 
                                  String propertyName, boolean incoming, boolean includingEquivalentClass) throws OntoquestException
   {
     Collection<Relationship> edgeSet = new LinkedHashSet<Relationship> (500);
     
-    ResourceSet  rs = DbBasicFunctions.getInstance().searchEnclosure( kbid, term, c, propertyName, incoming,includingEquivalentClass);
+    ResourceSet  rs = DbBasicFunctions.getInstance().searchClosure( kbid, term, c, propertyName, incoming,includingEquivalentClass);
     while (rs.next()) {
       String label1 = rs.getString(3);
       if ( label1 == null)

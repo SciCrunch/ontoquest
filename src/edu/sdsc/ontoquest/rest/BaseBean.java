@@ -11,7 +11,7 @@ import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
 /**
- * @version $Id: BaseBean.java,v 1.9 2013-10-22 19:29:31 jic002 Exp $
+ * @version $Id: BaseBean.java,v 1.10 2013-10-29 23:52:11 jic002 Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
  * 
@@ -20,7 +20,7 @@ public abstract class BaseBean {
 	public enum InputType { OID, NAME, TERM, ID }
   
   // added ALLSUBCLASSES to use new function and search fat nodes.
-	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL,EDGE_RELATION,ALLSUBCLASSES,ALLPARTSOF,ALLHASPARTS, ENCLOSURE }
+	public enum NeighborType { PARENTS, CHILDREN, SUBCLASSES, SUPERCLASSES, PARTS, WHOLE, ALL,EDGE_RELATION,ALLSUBCLASSES,ALLPARTSOF,ALLHASPARTS, CLOSURE }
 
 	public enum SiblingsType { CLASSES, PARTS }
 
@@ -33,6 +33,8 @@ public abstract class BaseBean {
 	//  private static HashSet<String> externalSourcePropertySet = null;
 	private static HashSet<String> synonymPropertySet = null;
 	private static BasicFunctions basicFunctions = DbBasicFunctions.getInstance();
+  
+  public static final String definitionProperty = "definition";
 
 	/**
 	 * @return the basicFunctions
@@ -101,7 +103,7 @@ public abstract class BaseBean {
 
 		// initialize definitionPropertyMap
 		definitionPropertySet = new HashSet<String>();
-		definitionPropertySet.add("definition");
+	//	definitionPropertySet.add("definition");
 		definitionPropertySet.add("description");
 		definitionPropertySet.add("externallySourcedDefinition");
 		definitionPropertySet.add("birnlexDefinition");
