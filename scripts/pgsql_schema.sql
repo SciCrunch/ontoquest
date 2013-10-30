@@ -1,7 +1,7 @@
 -- the main, top-lavel script to create tables and functions. 
 
-create schema ont2 AUTHORIZATION ontoquest;
-alter user ontoquest SET search_path to ont2,public;
+--create schema ont2 AUTHORIZATION ontoquest;
+--alter user ontoquest SET search_path to ont2,public;
 
 \i pgsql_tables.sql
 
