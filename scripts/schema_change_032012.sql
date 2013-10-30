@@ -1,3 +1,6 @@
+-- ignore this file. The changes should have been incorporated into the 
+-- pgsql_tables.sql file. -- CJ
+
 alter table resourcetype drop constraint resourcetype_chk;
 
 alter table resourcetype add  CONSTRAINT resourcetype_chk CHECK (rtype IN ('a', 'b', 'c', 'd', 'e', 'f', 'h', 
