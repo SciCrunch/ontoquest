@@ -1,5 +1,13 @@
 select update_graph(id) from kb where name = ':ontName';
 
+select update_equivalent_class_group(id) from kb where name = ':ontName';
+
+select infer_subclass_intersect(id) from kb where name = ':ontName';
+
+select infer_inheritable_property_on_class(kb.id,n.rid ) from kb, graph_nodes n, resourcetype rt
+where kb.name = ':ontName' and n.kbid = kb.id and rt.name = 'property' 
+   and rt.id = n.rtid and lower(n.label)= 'part_of';
+
 select update_inference_edges(id) from kb where name = ':ontName';
 
 select * from create_dag_index(':ontName', 'has_part', true, false);
