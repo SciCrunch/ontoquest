@@ -406,7 +406,8 @@ CREATE TABLE literal (
 
 CREATE INDEX literal_idx2 ON literal (datatypeid);
 
-CREATE INDEX literal_idx3 ON literal (lower(lexicalform));
+--removed by Jing Chen, because some literals are too long and btree indexes are not allow on the in postgresql
+--CREATE INDEX literal_idx3 ON literal (lower(lexicalform));
 
 CREATE INDEX literal_idx4 ON literal (kbid);
 
