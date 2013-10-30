@@ -917,7 +917,7 @@ BEGIN
       end if; 
     END LOOP;
 
-    select move_equivalent_class_edges(thekbid;
+    select move_equivalent_class_edges(thekbid);
 
     RAISE NOTICE 'Done merging equivalent classes.';
     
@@ -1579,12 +1579,6 @@ $BODY$
       and exists (select * from graph_edges_all g2 where g2.rtid2 = g1.rtid1 and g2.rid2 = g1.rid1 and g2.hidden = false);
     raise notice 'updated the status of hidden edges.';
 
-
-    -- merge the nodes that are excactly equivalent 
-    perform update_equivalent_class_group(theKbid);
-    
-    
-
     -- update node labels.
 	perform set_labels(theKbid, setLabelFlag);
 	raise notice 'updated node labels.';
@@ -1693,6 +1687,9 @@ end;
 $$ language plpgsql;
 
 
+-- get the list of property_id list of all subproperties 
+-- of a given pid in a knowledge base.
+-- the results includes the property itself and all subproperties.
 create or replace function get_subproperty_id_str (theKbid integer, pid integer)
 returns text as $$
 begin
@@ -1715,29 +1712,8 @@ select ss.childid from include_subproperty ss)
 end;
 $$ language plpgsql;
 
-
-create or replace function get_subproperty_id_str (theKbid integer, pid integer)
-returns text as $$
-begin
-  if not exists (select 1 from property where id = pid)
-  then
-    raise 'Property id % not found in property table.', pid;
-  end if;
-  
-   return array_to_string(array(
-( with recursive include_subproperty (childid, parentid) as (
-       select childid, parentid from subpropertyof where parentid = pid and kbid = theKbid
-  union 
-    select p.childid, p.parentid 
-    from include_subproperty sp, subpropertyof p
-    where p.parentid = sp.childid
-   )
-select ss.childid from include_subproperty ss)
-  )||pid, ',');
-     
-end;
-$$ language plpgsql;
-
+-- If a property is inheritable, and a class node has an edge of that property, 
+-- adding inferred edges to all the subClasses of that class node.
 create or replace function infer_inheritable_property_on_class (theKbid integer, property_id integer)
 returns bigint as $$
 declare 
@@ -1832,8 +1808,13 @@ begin
 end;
 $$ language plpgsql;
 
+-- term_id: the external identifier of the term to search
+-- property_name: name of the property to search. This is the 'label' not the external id of the property, and this property has to be transitive.
+-- kb: id of the knowledge base.
+-- incoming: true if want to follow the incomming edges, otherwise following the outgoing edges.
+-- includes_equivalent_class: included the equivalient classes in the result if this flag is set to true.
 
-CREATE OR REPLACE FUNCTION get_enclosure_by_term_id(term_id character varying, property_name character varying, kb integer, incoming boolean, includes_eqivalent_class boolean)
+CREATE OR REPLACE FUNCTION get_closure_by_term_id(term_id character varying, property_name character varying, kb integer, incoming boolean, includes_equivalent_class boolean)
   RETURNS SETOF edge2 AS
 $BODY$
   
@@ -1848,31 +1829,33 @@ $BODY$
     v_eq_pid integer;   
   BEGIN
 
-     select id into v_pid from property where name = property_name;
+     select rid into v_pid from graph_nodes where label = property_name and kbid=kb and rtid=15 limit 1; --property where name = property_name;
      if v_pid is null then
        raise 'Property % not found in property table.', pid;
      end if;
      
-      pid_array :=array( 
-      with recursive include_subproperty (childid, parentid) as (
-         select childid, parentid from subpropertyof sp , property p where sp.parentid = p.id 
-            and p.name =property_name  and p.kbid =kb
+      pid_array :=array(
+       (select rid from graph_nodes p where p.label =property_name  and p.kbid =kb and p.rtid=15)
+       union
+       (with recursive include_subproperty (childid, parentid) as (
+         select childid, parentid from subpropertyof sp , graph_nodes p where p.label =property_name and p.rtid=15
+            and sp.parentid = p.rid and p.kbid =kb
         union 
-         select p.childid, p.parentid 
+         select p.childid, p.parentid    
          from include_subproperty sp, subpropertyof p
          where p.parentid = sp.childid
       )
-      select ss.childid as id from include_subproperty ss ) || v_pid;
+      select ss.childid as id from include_subproperty ss ) );
 
       select id into v_eq_pid from property where name = 'equivalentClass';
 
-      if includes_eqivalent_class then 
+      if includes_equivalent_class then 
          pid_equ_array := pid_array || v_eq_pid;
       else 
          pid_equ_array := pid_array ;
       end if;
       
-      raise notice 'pid arrary is %, equivalentClass pid is %', pid_array, v_eq_pid;
+      raise notice 'pid arrary is %, equivalentClass pid is %', pid_equ_array, v_eq_pid;
 
       if incoming then 
 
@@ -1898,17 +1881,19 @@ $BODY$
       where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id 
           order by ie.depth, ie.rid2, ie.rid1
       LOOP
-         return next rec;
 
-         if includes_eqivalent_class then 
+         if includes_equivalent_class then 
+           return next rec;
            for rec_i in select e.rid2, e.rtid2, n2.label as name1 , e.rid1, e.rtid1, n1.label as name2 , e.pid,
             'equivalentClass'::TEXT as pname from graph_edges e, graph_nodes n1, graph_nodes n2
              where e.rid1 = rec.rid1 and e.rtid1 = rec.rtid1 and e.kbid = kb and n1.rid= e.rid1 and e.pid = v_eq_pid
                  and n1.rtid=e.rtid1 and n2.rid = e.rid2 and n2.rtid = e.rtid2 
            LOOP
- 	     return next rec_i;	
-            
+ 	           return next rec_i;	
            end loop; 
+         else if rec.rtid1 not in (3,8,9) then 
+             return next rec;
+            end if;
          end if;
 
       END LOOP;
@@ -1936,18 +1921,20 @@ $BODY$
       where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id 
          order by ie.depth, ie.rid1, ie.rid2
       LOOP
-         return next rec;
 
-         if includes_eqivalent_class then 
+         if includes_equivalent_class then 
+           return next rec;
            for rec_i in select e.rid2, e.rtid2, n2.label as name1 , e.rid1, e.rtid1, n1.label as name2 , e.pid,
             'equivalentClass'::TEXT as pname from graph_edges e, graph_nodes n1, graph_nodes n2
              where e.rid2 = rec.rid1 and e.rtid2 = rec.rtid1 and e.kbid = kb and n1.rid= e.rid1 and e.pid = v_eq_pid
                  and n1.rtid=e.rtid1 and n2.rid = e.rid2 and n2.rtid = e.rtid2 
            LOOP
- 	     return next rec_i;	
+ 	           return next rec_i;	
            end loop; 
+         else if rec.rtid2 not in (3,8,9) then
+             return next rec;
+           end if;
          end if;
-         
 
       END LOOP;
 
@@ -1960,3 +1947,5 @@ $BODY$
   LANGUAGE plpgsql
   COST 100
   ROWS 2000;
+
+
