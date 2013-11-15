@@ -830,7 +830,7 @@ BEGIN
     select id into class_rtid from resourcetype where name = 'primitiveclass';
     delete from equivalentclassgroup where kbid = thekbid; 
 
-    FOR mvrec IN SELECT * from equivalentclass e where e.class_rtid2 = class_rtid
+    FOR mvrec IN SELECT * from equivalentclass e where e.class_rtid2 = class_rtid and kbid = thekbid
     LOOP
       if exists ( select 1 from equivalentclassgroup c
                   where (c.rid = mvrec.classid1 and c.ridm = mvrec.classid2) 
@@ -860,7 +860,7 @@ BEGIN
          RAISE NOTICE '% is not a member, but % is a representitive , add it to group.', mvrec.classid1, mvrec.classid2 ;
 
          -- check if representitive is an obsolete node
-	 if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = mvrec.classid2 and n1.rtid=class_rtid)
+	       if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = mvrec.classid2 and n1.rtid=class_rtid)
             and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid1 and n2.rtid=class_rtid)
          then 
             update equivalentclassgroup
@@ -917,7 +917,7 @@ BEGIN
       end if; 
     END LOOP;
 
-    select move_equivalent_class_edges(thekbid);
+    perform move_equivalent_class_edges(thekbid);
 
     RAISE NOTICE 'Done merging equivalent classes.';
     
