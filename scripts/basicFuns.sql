@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION get_name(theRid INTEGER, theRtid INTEGER, prefLabel B
   Get the name of node identified by (theRid, theRtid). If prefLabel is true, use its rdfs:label
   as node name. If prefLabel is false or rdfs:label is not set, just return the name.
  */
-  DECLARE
+   DECLARE
     rec RECORD;
     result TEXT;  
   BEGIN
@@ -756,13 +756,67 @@ CREATE OR REPLACE FUNCTION delete_kb(kbName VARCHAR)
   RETURNS boolean AS $$
   DECLARE
     dag_id INTEGER;
+    v_kbid Integer;
   BEGIN
     FOR dag_id IN select d.id from dag_index_metadata d, kb k 
       where d.kbid = k.id and k.name = kbName 
     LOOP
       perform delete_dag_index(dag_id);
     END LOOP;
+    
+    select id into v_kbid from kb where name = kbName;
 
+    if v_kbid is null then
+      raise 'Knowledgebase % not found in db.', kbName;    
+    end if;
+/*    
+    delete from graph_edges_all where kbid = v_kbid;
+    delete from graph_nodes_all where kbid = v_kbid;
+    delete from allvaluesfromclass where kbid = v_kbid;
+    delete from alldifferentindividual where kbid = v_kbid;
+    delete from cardinalityclass where kbid = v_kbid;
+    delete from complementclass where kbid = v_kbid;
+    delete from datarange where kbid = v_kbid;
+    delete from datatype_restriction where kbid = v_kbid;
+    delete from differentindividual where kbid = v_kbid;
+    delete from disjointclass where kbid = v_kbid;
+    delete from disjointunionclass where kbid = v_kbid;
+    delete from domain where kbid = v_kbid;
+
+    delete from equivalentclass where kbid = v_kbid;
+    delete from equivalentclassgroup where kbid = v_kbid;
+    delete from equivalentproperty where kbid = v_kbid;
+ 
+    delete from hasself where kbid = v_kbid;
+    delete from hasvalue where kbid = v_kbid;
+    delete from intersectionclass where kbid = v_kbid;
+    delete from inversepropertyof where kbid = v_kbid;
+    delete from maxcardinalityclass where kbid = v_kbid;
+    delete from mincardinalityclass where kbid = v_kbid;
+    delete from oneof where kbid = v_kbid;
+
+    delete from relationship where kbid = v_kbid;
+    delete from sameindividual where kbid = v_kbid;
+    delete from somevaluesfromclass where kbid = v_kbid;
+    delete from subpropertyof   where kbid = v_kbid;
+    delete from subclassof      where kbid = v_kbid;
+    delete from typeof where kbid = v_kbid;
+    delete from unionclass where kbid = v_kbid;
+
+    delete from range           where kbid = v_kbid;
+
+    delete from datatype where kbid = v_kbid;
+    delete from property        where kbid = v_kbid;
+    delete from ontologyuri     where kbid = v_kbid;
+    delete from namespace       where kbid = v_kbid;
+    delete from literal         where kbid = v_kbid;
+    delete from individual      where kbid = v_kbid;
+    delete from primitiveclass where kbid = v_kbid;
+    delete from ontologyimport where kbid = v_kbid;
+*/
+    insert into kb_history (id, name, creation_date, removal_date)
+    select  id,name, creation_date, current_time
+    from kb where name = kbName;
     delete from kb where name = kbName;
     return true;
   END;
