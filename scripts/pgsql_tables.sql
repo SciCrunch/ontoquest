@@ -273,7 +273,7 @@ CREATE TABLE property (
   is_symmetric boolean default false,
   is_functional boolean default false,
   is_inversefunctional boolean default false,
-  is_datatype boolean default false,
+  is_datatype boolean default false,  -- Is dataProperty?
   is_owl boolean default true, -- is owl property or rdf:Property?
   is_annotation boolean default false, -- is annotation property?
   is_system boolean default false, -- protege-related field
@@ -437,7 +437,7 @@ CREATE TABLE primitiveclass (
   id serial PRIMARY KEY,
   name text NOT NULL,
   hashcode integer,
-  is_system boolean default false,
+  is_system boolean default false,  -- Based on version 3.5.5 of OWLAPI package, this flag is true when the URI is owl:Thing or owl:Nothing
   is_owlclass boolean default true, -- is owl:Class (true) or rdfs:Class (false)?
   is_deprecated boolean default false, -- is owl:DeprecatedClass?
   nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
@@ -995,3 +995,12 @@ INSERT INTO resourcetype VALUES (18, 'ontologyuri', 'k');
 INSERT INTO resourcetype VALUES (20, 'hasself', 'f');
 
 INSERT INTO resourcetype VALUES (21, 'datatype_restriction', 'e');
+
+/* store the loading history of ontologies */
+CREATE TABLE kb_history
+(
+  id integer,
+  name character varying,
+  creation_date timestamp without time zone,
+  removal_date timestamp without time zone
+);
