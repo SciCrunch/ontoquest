@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ontoquest>
+  <database>
+    <type>PostgreSQL</type>
+    <driver>org.postgresql.Driver</driver>
+     <url>jdbc:postgresql://hostname:5432/dbname</url>
+    <user>username</user>
+    <password>password</password>
+    <schema_file>scripts/pgsql_schema.sql</schema_file>
+    <stmt_file>config/query_pgsql.xml</stmt_file>
+    <stmt_file>config/query_pgsql_ext.xml</stmt_file>
+    <stmt_file>config/load_pgsql.xml</stmt_file>
+  </database>
+  <basic_function_class>edu.sdsc.ontoquest.db.DbBasicFunctions</basic_function_class>
+  <log_config>config/log4j.properties</log_config>
+  <ontology_name>ont_name</ontology_name>
+  <script_name>scripts/pgsql_postprocess.sql</script_name>
+  <berkeleyDB>
+  	<envDir>bdb</envDir>
+  </berkeleyDB>
+  <tmp_dir>tmp</tmp_dir>
+</ontoquest>
