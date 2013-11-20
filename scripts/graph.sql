@@ -124,8 +124,9 @@ CREATE OR REPLACE FUNCTION compute_label_from_graph(theRid INTEGER, theRtid INTE
   BEGIN
     
     select label into theLabel from graph_nodes all where rid = theRid and rtid = theRtid;
-    if theLabel is not null return theLabel end if;
-
+    if theLabel is not null then 
+      return theLabel ;
+    end if;
 
     IF theRtid = 10 THEN
       select get_label(propertyid, 15), get_label(valueid, rtid) into theLabel, theLabel2 from hasvalue where id = theRid;
