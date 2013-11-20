@@ -178,6 +178,12 @@ BEGIN
   END LOOP;
   raise notice 'Deleted all redundant descendants of categories.';
 
+  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid)
+  select distinct t.rid, t.rtid, t.rid, t.rtid from nif_term t where 
+  t.rtid = 1 and 
+  exists ( select 1 from nif_category nc where  lower(t.term) = nc.name)
+  and not exists ( select 1 from term_category_tbl tc where tc.rid = t.rid and tc.rtid = 1);
+
   -- fill the label for categories
   update term_category_tbl tc set category = (select n.name from graph_nodes n, graph_edges e, property p 
     where p.id = e.pid and   p.name = 'altLabel' and e.rid2 = n.rid and e.rtid2 = n.rtid and tc.cat_rid = e.rid1 and 
