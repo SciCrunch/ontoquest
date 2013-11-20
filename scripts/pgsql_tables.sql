@@ -189,6 +189,8 @@ CREATE TABLE ontologyuri (
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
   , browsertext text
   , document_uri text -- the location of ontology, may not be same as uri
+  ,owl_content text    -- actual content of the owl file
+  ,owl_file_length bigint  -- length of the owl file.
 );
 
 CREATE INDEX ontologyuri_idx1 ON ontologyuri (kbid);
