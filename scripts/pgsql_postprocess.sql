@@ -23,8 +23,8 @@ select fill_term_category(id, '''Anatomical object'', ''brain'', ''Cell'', ''Dev
 
 select fill_nif_cards();
 
---update kb set name = ':oldName' where name = ':finalName';
+update kb set name = ':oldName' where name = ':finalName';
 
---update kb set name = ':finalName' where name = ':ontName';
+update kb set name = ':finalName' where name = ':ontName';
 
 --select delete_kb(':oldName');
