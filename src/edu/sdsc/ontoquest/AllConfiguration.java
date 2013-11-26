@@ -91,9 +91,13 @@ public class AllConfiguration {
     if (!f.exists()) {
       f = new File(workDir + fileName);
       if (!f.exists()) {
-        throw new ConfigurationException(
-            "File does not exist. Property key -- " + key + "; value -- " + fileName + "; absolute path -- "
-            + f.getAbsolutePath());
+        f.mkdirs();
+        if (!f.exists()) {
+          throw new ConfigurationException(
+            "Fail to create direcotry " + f.getAbsolutePath() + 
+             ". Property key -- " + key + "; value -- " + fileName + ";"
+          );
+        }
       }
     }
     return f;   
