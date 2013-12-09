@@ -156,7 +156,8 @@ public class Ontology extends BaseBean {
     Element nameElem = doc.createElement("displayLabel");
     e.appendChild(nameElem);
     nameElem.appendChild(doc.createTextNode(getName()));
-    
+
+/*    
     Element titleElem = doc.createElement("title");
     e.appendChild(titleElem);
     titleElem.appendChild(doc.createTextNode(getTitle()));
@@ -176,11 +177,12 @@ public class Ontology extends BaseBean {
     Element versionElem = doc.createElement("version");
     e.appendChild(versionElem);
     versionElem.appendChild(doc.createTextNode(version));
-    
+*/    
     Element formatElem = doc.createElement("format");
     e.appendChild(formatElem);
     formatElem.appendChild(doc.createTextNode(format));
-    
+
+/*    
     Element contributorsElem = doc.createElement("contributors");
     e.appendChild(contributorsElem);
     for (String contributor : contributors) {
@@ -192,7 +194,7 @@ public class Ontology extends BaseBean {
     Element dateElem = doc.createElement("date_created");
     e.appendChild(dateElem);
     dateElem.appendChild(doc.createTextNode(dateCreated));
-    
+*/    
     return e;
   }
 
