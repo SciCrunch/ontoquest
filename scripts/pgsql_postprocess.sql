@@ -2,6 +2,8 @@ select update_graph(id) from kb where name = ':ontName';
 
 select update_equivalent_class_group(id) from kb where name = ':ontName';
 
+select rm_duplicate_synonym(id) from kb where name = ':ontName';
+
 select infer_subclass_intersect(id) from kb where name = ':ontName';
 
 select infer_inheritable_property_on_class(kb.id,n.rid ) from kb, graph_nodes n, resourcetype rt
