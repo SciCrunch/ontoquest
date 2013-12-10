@@ -1950,3 +1950,19 @@ $BODY$
   ROWS 2000;
 
 
+create or replace function rm_duplicate_synonym (thekbid integer)
+ returns void AS
+$BODY$
+/*
+  Remove the synonyms that are the has the same splelling as the class label (if ignoring the case differences)
+*/
+Begin
+delete from graph_edges_all e
+where 
+  exists (select 1 from graph_nodes_all n, property p, graph_nodes_all n2
+          where e.rid1 = n.rid and e.rtid1 = n.rtid and e.rtid1 = 1 and p.id = e.pid
+                and p.name ='synonym' and n2.rid = e.rid2 and n2.rtid = e.rtid2 and lower(n.label)=lower(n2.label)
+                and e.kbid = thekbid);
+end;
+$BODY$
+language plpgsql;
