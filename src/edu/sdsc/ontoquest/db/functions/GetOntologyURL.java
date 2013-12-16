@@ -41,7 +41,7 @@ public class GetOntologyURL implements OntoquestFunction<ResourceSet>{
     args[0] = sb.toString();
     args[1] = String.valueOf(nodeIDs.length);
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to get URL of the nodes -- " + args[0]);
+        "Failed to get URL of the nodes -- " + args[0], -1);
   }
 
 }
