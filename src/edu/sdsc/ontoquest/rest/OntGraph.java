@@ -34,6 +34,8 @@ import java.util.Collection;
 public class OntGraph extends BaseBean {
 
 	private static final String[] defaultExcludedProperties = {"disjointWith", "sameAs"};
+  
+  private boolean isTruncated;
 
 	private static int extractLevel(Map<String, Object> attributes) throws OntoquestException {
 		int hops = 0;
@@ -87,12 +89,11 @@ public class OntGraph extends BaseBean {
 		f = new GetNeighbors(nodeIDs, kbId, includedProperties,
 				excludedProperties, edgeType, true, true, hops, true);
 
-		return getRelatedClasses(f, nodeMap,
-				new HashSet<Relationship>(), context);
+		return getRelatedClasses(f, context);
 	}
 
 	public static OntGraph get(String inputStr, NeighborType type, int kbId,
-			Map<String, Object> attributes, InputType inputType, Context context ) throws OntoquestException {
+			Map<String, Object> attributes, InputType inputType, Context context, int lmt ) throws OntoquestException {
 
 		int hops = extractLevel(attributes);
 		int edgeType = GetNeighbors.EDGE_BOTH;
@@ -137,15 +138,15 @@ public class OntGraph extends BaseBean {
 			int[][] idArray = new int[idList.size()][2];
 			idList.toArray(idArray);
 			f = new GetNeighbors(idArray, kbId, includedProperties, excludedProperties, 
-					edgeType, true, true, hops, true);
+					edgeType, true, true, hops, true, lmt);
 			//      f = new GetNeighbors(new String[]{inputStr}, kbId, true, includedProperties, 
 			//          excludedProperties, edgeType, true, true, hops, true);
 		} else { // default type: InputType.TERM      
 			f = new GetNeighbors(new String[]{inputStr}, kbId, includedProperties, excludedProperties, 
-					true, edgeType, true, true, hops, true);
+					true, edgeType, true, true, hops, true, lmt);
 		}
 
-		return getRelatedClasses(f, nodeMap, new HashSet<Relationship>(), context);
+		return getRelatedClasses(f, context);
 	}
   /**
    *
@@ -199,7 +200,7 @@ public class OntGraph extends BaseBean {
       stmt.close();
       DbUtility.releaseDbConnection(conn, context);
       
-      return new OntGraph(result);
+      return new OntGraph(result, false);
     } catch (Exception e) {
       try {
         rs.close();
@@ -218,10 +219,13 @@ public class OntGraph extends BaseBean {
   }
 
 
-	private static OntGraph getRelatedClasses(OntoquestFunction<ResourceSet> f,
-			HashMap<String, int[]> nodeMap, Set<Relationship> edgeSet, Context context)
+	private static OntGraph getRelatedClasses(OntoquestFunction<ResourceSet> f, Context context)
 					throws OntoquestException {
+    
+	  Set<Relationship> edgeSet = new HashSet<Relationship>();
+    
 		ResourceSet rs = f.execute(context, getVarList8());
+    int counter = 0;
 		while (rs.next()) {
 			// int[] id1 = new int[] { rs.getInt(1), rs.getInt(2) };
 			// String idStr = ClassNode.generateId(id1[0], id1[1]);
@@ -247,6 +251,7 @@ public class OntGraph extends BaseBean {
 			if (!edgeSet.contains(e)) {
 				edgeSet.add(e);
 			}
+      counter ++;
 		}
 		rs.close();
 
@@ -254,15 +259,26 @@ public class OntGraph extends BaseBean {
 		// nodeMap.values().toArray(idArray);
 
 		// Set<ClassNode> nodes = ClassNode.get(idArray, context);
-		return new OntGraph(edgeSet);
+    if ( f instanceof GetNeighbors)  
+    {
+      if (((GetNeighbors)f).getResultLimit() < counter) 
+      {
+        return new OntGraph(edgeSet, true);
+      }
+    }
+		return new OntGraph(edgeSet, false);
 	}
 
 	//  private Set<ClassNode> nodes;
 	private Collection<Relationship> edges;
 
+  public int size () { return edges.size(); }
+  
+  public boolean isTruncated () {return isTruncated;}
 
-	public OntGraph(Collection<Relationship> edges) {
+	public OntGraph(Collection<Relationship> edges, boolean isTruncated) {
 		this.edges = edges;
+    this.isTruncated = isTruncated;
 	}
 
 	//  /**
