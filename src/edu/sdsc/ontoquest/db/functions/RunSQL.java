@@ -20,8 +20,11 @@ public class RunSQL implements OntoquestFunction<ResourceSet> {
 
   private String sql;
   
+  private int resultLimit ;
+  
   public RunSQL(String sql) {
     this.sql = sql;
+    resultLimit = -1;
   }
   
   /**
@@ -31,7 +34,7 @@ public class RunSQL implements OntoquestFunction<ResourceSet> {
   public ResourceSet execute(Context context, List<Variable> varList)
       throws OntoquestException {
     return DbUtility.executeSQLQuery(sql, context, varList, new String[]{}, 
-        "Failed to run user-supplied SQL query.");
+        "Failed to run user-supplied SQL query.", resultLimit);
   }
 
 }
