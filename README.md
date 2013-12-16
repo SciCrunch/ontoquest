@@ -19,6 +19,10 @@ user
 password
 ontology_name (pick a name for your ontology)
 
+Modify WEB-INF/web.xml.  
+Configure the OntologyName with the same name as whats configured in
+config/ontoquest.xml
+
 Build:
 run ant -> this will create a war file in the dist directory that can be deployed.  
            It will also create a jar file that can be used as a library.
