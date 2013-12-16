@@ -88,11 +88,20 @@ public class DbUtility {
 	}
 
 	public static ResourceSet executeSQLQuery(String sql, Context context,
-			List<Variable> varList, String[] args, String errorMsg)
+			List<Variable> varList, String[] args, String errorMsg, int resultLimit)
 					throws OntoquestException {
 
 		Connection conn = null;
 		ResultSet rs = null;
+    
+    if ( resultLimit > 0  ) 
+    {
+      if ( ! sql.matches(".*\\s+ limit \\d+\\s*\\z") )
+      {
+        sql = sql + " limit " + (resultLimit +1);
+      }
+    }
+
 		try {
 			Utility.checkBlank(sql, OntoquestException.Type.EXECUTOR,
 					"Invalid statement: " + sql);
@@ -125,10 +134,10 @@ public class DbUtility {
 
 	public static ResourceSet executeSQLQueryName(String sqlProperty,
 			Context context, List<Variable> varList, String[] args,
-			String errorMsg) throws OntoquestException {
+			String errorMsg, int resultLimit) throws OntoquestException {
 		try {
 			String sql = AllConfiguration.getConfig().getString(sqlProperty);
-			return executeSQLQuery(sql, context, varList, args, errorMsg);
+			return executeSQLQuery(sql, context, varList, args, errorMsg, resultLimit);
 		} catch (ConfigurationException ce) {
 			throw new OntoquestException(OntoquestException.Type.BACKEND,
 					"Invalid configuration: " + sqlProperty + ". Details: "
@@ -145,7 +154,7 @@ public class DbUtility {
 			String seqName = AllConfiguration.getConfig().getString(seqProp);
 			rs = DbUtility.executeSQLQueryName("query.get_seq_nextval",
 					context, varList1, new String[] { seqName },
-					"Failed to fetch the next value of sequence: " + seqName);
+					"Failed to fetch the next value of sequence: " + seqName, -1);
 			if (rs.next()) {
 				return rs.getInt(1);
 			}
