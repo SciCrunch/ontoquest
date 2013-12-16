@@ -17,6 +17,9 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
   public static final int EDGE_INCOMING = 1;
   public static final int EDGE_OUTGOING = -1;
   public static final int EDGE_BOTH = 0;
+  
+  public static final int defaultResultLimit = 1000;
+  
   public enum PropertyType {OBJECT, DATATYPE, ANNOTATION, SYSTEM, ALL};
   
   int kbid = -1;
@@ -32,6 +35,8 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
   int edgeDirection = EDGE_BOTH;
   int level = 1; // If level=1, get direct neighbors. If level > 2, get neighbors and their neighbors.
   PropertyType[] propTypes = null;
+  
+  private int resultLimit;
   
   /**
    * Get neighbors of the input node. Exclude hidden edges.
@@ -88,13 +93,22 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     this(terms, kbid, includedProperties, excludedProperties, isSynonymIncluded, edgeDirection,
         excludeHiddenRelationship, isClassOnly, level, allowSubproperties, new PropertyType[]{PropertyType.ALL});
   }
-  
+
+  public GetNeighbors(String[] terms, int kbid, 
+      String[] includedProperties,  String[] excludedProperties, boolean isSynonymIncluded, int edgeDirection, 
+      boolean excludeHiddenRelationship, boolean isClassOnly, int level, boolean allowSubproperties, int lmt) {
+    this(terms, kbid, includedProperties, excludedProperties, isSynonymIncluded, edgeDirection,
+        excludeHiddenRelationship, isClassOnly, level, allowSubproperties, new PropertyType[]{PropertyType.ALL});
+    this.resultLimit = lmt;
+  }
+
+
   public GetNeighbors(String[] terms, int kbid, 
       String[] includedProperties,  String[] excludedProperties, boolean isSynonymIncluded, int edgeDirection, 
       boolean excludeHiddenRelationship, boolean isClassOnly, int level, boolean allowSubproperties, PropertyType[] propTypes) {
     this.terms = terms;
     setParameters(kbid, includedProperties, excludedProperties, isSynonymIncluded, 
-        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes);
+        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes, defaultResultLimit);
   }
 
   public GetNeighbors(String[] terms, int kbid, boolean searchByName,
@@ -110,7 +124,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     this.terms = terms;
     this.searchByName = searchByName;
     setParameters(kbid, includedProperties, excludedProperties, false, 
-        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes);
+        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes, defaultResultLimit);
   }
 
   
@@ -153,18 +167,35 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     this(nodeIDs, kbid, includedProperties, excludedProperties, edgeDirection,
         excludeHiddenRelationship, isClassOnly, level, allowSubproperties, new PropertyType[]{PropertyType.ALL});
   }
+
+  public GetNeighbors(int[][] nodeIDs, int kbid,
+      String[] includedProperties, String[] excludedProperties, int edgeDirection, 
+      boolean excludeHiddenRelationship, boolean isClassOnly, int level, boolean allowSubproperties, int limit) {
+    this(nodeIDs, kbid, includedProperties, excludedProperties, edgeDirection,
+        excludeHiddenRelationship, isClassOnly, level, allowSubproperties, new PropertyType[]{PropertyType.ALL}, limit);
+  }
+
   
   public GetNeighbors(int[][] nodeIDs, int kbid,
       String[] includedProperties, String[] excludedProperties, int edgeDirection, 
       boolean excludeHiddenRelationship, boolean isClassOnly, int level, boolean allowSubproperties, PropertyType[] propTypes) {
     this.nodeIds = nodeIDs;
     setParameters(kbid, includedProperties, excludedProperties, false, 
-        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes);
+        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes, defaultResultLimit);
   }
+
+  public GetNeighbors(int[][] nodeIDs, int kbid,
+      String[] includedProperties, String[] excludedProperties, int edgeDirection, 
+      boolean excludeHiddenRelationship, boolean isClassOnly, int level, boolean allowSubproperties, PropertyType[] propTypes, int limit) {
+    this.nodeIds = nodeIDs;
+    setParameters(kbid, includedProperties, excludedProperties, false, 
+        edgeDirection, excludeHiddenRelationship, isClassOnly, level, allowSubproperties, propTypes, limit);
+  }
+
 
   private void setParameters(int kbid, String[] includedProperties, String[] excludedProperties,
       boolean isSynonymIncluded, int edgeDirection, boolean excludeHiddenRelationship, 
-      boolean isClassOnly, int level, boolean allowSubproperties, PropertyType[] propTypes) {
+      boolean isClassOnly, int level, boolean allowSubproperties, PropertyType[] propTypes, int limit) {
     this.kbid = kbid;
     this.includedProperties = includedProperties;
     this.excludedProperties = excludedProperties;
@@ -175,6 +206,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     this.level = level;
     this.allowSubproperties = allowSubproperties;
     this.propTypes = propTypes;
+    this.resultLimit = limit;
   }
   
   public ResourceSet execute(Context context, List<Variable> varList)
@@ -183,14 +215,14 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     if (nodeIds != null && nodeIds.length > 0) 
       return executeUsingIDArray(context, varList);
     else if (terms != null && terms.length > 0) {
-      return searchByName?executeUsingNameArray(context, varList)
-          :executeUsingTermArray(context, varList);
+      return searchByName?executeUsingNameArray(context, varList, resultLimit)
+          :executeUsingTermArray(context, varList, resultLimit);
     } else
       throw new OntoquestException("No search term or id is specified!");
   }
 
   private ResourceSet executeUsingNameArray(Context context,
-      List<Variable> varList) throws OntoquestException {
+      List<Variable> varList, int resultLimit) throws OntoquestException {
     String queryName = null;
     if (edgeDirection == GetNeighbors.EDGE_INCOMING)
       queryName = "query.getNeighborInByName";
@@ -212,12 +244,12 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     args[9] = composePropertyType();
 
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")");
+        "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")", resultLimit);
 
   }
 
   private ResourceSet executeUsingTermArray(Context context,
-      List<Variable> varList) throws OntoquestException {
+      List<Variable> varList, int resultLimit) throws OntoquestException {
     String queryName = null;
     if (edgeDirection == GetNeighbors.EDGE_INCOMING)
       queryName = "query.getNeighborInByLabel";
@@ -239,7 +271,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     args[9] = composePropertyType();
 
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")");
+        "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")", resultLimit);
 
   }
         
@@ -271,7 +303,7 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     args[8] = composePropertyType();
 
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")");
+        "Failed to get neighbors of term(s)("+args[0]+") (kbid="+kbid+")", resultLimit);
   }
 
   private String composePropertyType() {
@@ -298,4 +330,6 @@ public class GetNeighbors implements OntoquestFunction<ResourceSet> {
     }
     return result;
   }
+  
+  public int getResultLimit() {return this.resultLimit;}
 }
