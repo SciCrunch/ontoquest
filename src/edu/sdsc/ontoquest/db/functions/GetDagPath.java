@@ -19,6 +19,8 @@ public class GetDagPath implements OntoquestFunction<ResourceSet> {
   private boolean excludeHiddenRelationship = true;
   private boolean allowSubproperties = false;
 
+  private final static int resultLimit = -1;
+
   /**
    * Get the path between node1 (rid1, rtid1) and node2 (rid2, rtid2) in the DAG.
    * @param rid1 resource id of node 1
@@ -52,7 +54,7 @@ public class GetDagPath implements OntoquestFunction<ResourceSet> {
     args[6] = String.valueOf(excludeHiddenRelationship);
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
         "Failed to get path between node 1 (rid="+rid1+", rtid="+rtid1+") and node 2(rid="
-        +rid2+", rtid="+rtid2+")");
+        +rid2+", rtid="+rtid2+")", resultLimit);
 
   }
 }
