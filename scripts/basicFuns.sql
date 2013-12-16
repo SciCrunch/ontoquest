@@ -171,9 +171,11 @@ CREATE OR REPLACE FUNCTION compose_pid_condition(pidList INTEGER[], include_subp
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION get_neighborhood(idList INTEGER[][], pidList INTEGER[], excludedPidList INTEGER[],
-       prefLabel boolean, maxHops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, class_only BOOLEAN, dir_incoming BOOLEAN)
-  RETURNS SETOF edge2 AS $$
+-- DROP FUNCTION get_neighborhood(integer[], integer[], integer[], boolean, integer, boolean, boolean, boolean, boolean);
+
+CREATE OR REPLACE FUNCTION get_neighborhood(idlist integer[], pidlist integer[], excludedpidlist integer[], preflabel boolean, maxhops integer, no_hidden boolean, include_subproperties boolean, class_only boolean, dir_incoming boolean)
+  RETURNS SETOF edge2 AS
+$BODY$
   
 /*
   Get neighbors of nodes. If a DAG index is created for the pid and suitable for the query, use the index for fast
@@ -207,14 +209,40 @@ CREATE OR REPLACE FUNCTION get_neighborhood(idList INTEGER[][], pidList INTEGER[
     rtid1_expr TEXT;
     rid2_expr TEXT;
     rtid2_expr TEXT;
+    current_rid integer;
+    current_rtid integer;
   BEGIN
     -- add initial nodes into the ancestors queue.
     FOR curIdx IN ARRAY_LOWER(idList,1)..ARRAY_UPPER(idList,1) LOOP
-      if neighbors is null then
-        neighbors := ARRAY[[idList[curIdx][1], idList[curIdx][2], 0]];
-      else
-        neighbors := neighbors || ARRAY[idList[curIdx][1], idList[curIdx][2], 0];
+      current_rtid := idList[curIdx][2];
+      current_rid := null;
+      
+      if current_rtid = 1 then 
+          select rid into current_rid from equivalentclassgroup g where g.ridm = idList[curIdx][1];
       end if;
+
+      if current_rid is null then
+           raise notice 'use the original rid %',idList[curIdx][1];  
+           current_rid := idList[curIdx][1];
+      else 
+         raise notice 'use the equivalent class rid %',current_rid;  
+      end if;
+
+     if neighbors is null then
+          neighbors := ARRAY[[current_rid, current_rtid, 0]];
+     else 
+          -- check if rec.rid1, rec.rtid1 is already in the neighbors array.
+          FOR i IN ARRAY_LOWER(neighbors,1)..ARRAY_UPPER(neighbors,1) LOOP
+              hasAdded := neighbors[i][1] = current_rid and neighbors[i][2] = current_rtid;
+              EXIT WHEN hasAdded;
+          END LOOP;
+        
+          IF hasAdded = false THEN
+             -- add the new neighbors to neighborhood array
+             neighbors := neighbors || ARRAY[current_rid, current_rtid, 0];
+          end if;
+      end if;
+ 
     END LOOP;
 
     -- check if dag index is built for pid
@@ -306,7 +334,11 @@ CREATE OR REPLACE FUNCTION get_neighborhood(idList INTEGER[][], pidList INTEGER[
     END LOOP; 
   RETURN;
   END;
-$$ LANGUAGE plpgsql;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100
+  ROWS 1000;
+
 
 CREATE OR REPLACE FUNCTION get_neighborhood(rid INTEGER, rtid INTEGER, pid INTEGER, prefLabel boolean, 
        maxHops INTEGER, no_hidden BOOLEAN, include_subproperties BOOLEAN, class_only BOOLEAN, dir_incoming BOOLEAN) 
