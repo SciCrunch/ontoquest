@@ -99,7 +99,7 @@ public class EstimateNeighborCount implements OntoquestFunction<ResourceSet> {
     args[6] = String.valueOf(isSynonymIncluded);
 
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to get neighbor count of term(s)("+args[0]+") (kbid="+kbid+")");
+        "Failed to get neighbor count of term(s)("+args[0]+") (kbid="+kbid+")", -1);
 
   }
 
@@ -123,7 +123,7 @@ public class EstimateNeighborCount implements OntoquestFunction<ResourceSet> {
     args[6] = String.valueOf(kbid);
 
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to get neighbor count of term(s)("+args[0]+") (kbid="+kbid+")");
+        "Failed to get neighbor count of term(s)("+args[0]+") (kbid="+kbid+")", -1);
 
   }
 
