@@ -25,14 +25,20 @@ public class CheckInferredDefinition implements OntoquestFunction<ResourceSet> {
   private int kbid = -1;
   private boolean isSynonymIncluded = false;
   
+  private int resultLimit; 
+  
   public CheckInferredDefinition(String[] terms, int kbid, boolean isSynonymIncluded) {
     this.terms = terms;
     this.kbid = kbid;
     this.isSynonymIncluded = isSynonymIncluded;
+    
+    resultLimit = -1;
   }
   
   public CheckInferredDefinition(int[][] nodeIds) {
     this.nodeIds = nodeIds;
+    
+    resultLimit = -1;
   }
   
   /* (non-Javadoc)
@@ -59,7 +65,7 @@ public class CheckInferredDefinition implements OntoquestFunction<ResourceSet> {
     args[0] = sb.toString();
 
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to check inferred classes of term IDs ("+args[0]+")");
+        "Failed to check inferred classes of term IDs ("+args[0]+")", resultLimit);
   }
   
   private ResourceSet executeUsingTerms(Context context, List<Variable> varList)
@@ -70,6 +76,6 @@ public class CheckInferredDefinition implements OntoquestFunction<ResourceSet> {
     args[1] = String.valueOf(isSynonymIncluded);
     args[2] = String.valueOf(kbid);
     return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-        "Failed to check inferred classes of term IDs ("+args[0]+")");
+        "Failed to check inferred classes of term IDs ("+args[0]+")", resultLimit);
   }
 }
