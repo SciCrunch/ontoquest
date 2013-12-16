@@ -18,8 +18,10 @@ public class GetDagLCA implements OntoquestFunction<ResourceSet> {
     private int pid;
     private boolean excludeHiddenRelationship = true;
     private boolean allowSubproperties = false;
+    
+    private final static int resultLimit = -1;
 
-//    boolean prefLabel = false, directOnly = false, namedClassOnly = false;
+//    boolean prefLabel = falsse, directOnly = false, namedClassOnly = false;
   
     /**
      * Get the Least Common Ancestor (LCA) of input nodeIDs in the Directed Acyclic Graph (DAG) 
@@ -53,7 +55,7 @@ public class GetDagLCA implements OntoquestFunction<ResourceSet> {
       args[2] = String.valueOf(allowSubproperties);
       args[3] = String.valueOf(excludeHiddenRelationship);
       return DbUtility.executeSQLQueryName(queryName, context, varList, args, 
-          "Failed to get the least common ancestor (LCA) of nodes: "+sb);
+          "Failed to get the least common ancestor (LCA) of nodes: "+sb, resultLimit);
     }
 
   }
