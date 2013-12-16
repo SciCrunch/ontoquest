@@ -37,6 +37,8 @@ public class NeighborhoodResource extends BaseResource {
   private NeighborType type = NeighborType.PARENTS;  // default
 //  private String classId;
   private OntGraph graph;
+
+  private static int defaultResultLimit = 1000;
   
   @Override
   protected void doInit() throws ResourceException {
@@ -65,6 +67,18 @@ public class NeighborhoodResource extends BaseResource {
           throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid value for parameter 'equivalentclass'. Supported values are 'true' and 'false'.");
       }
 
+      int lmt = defaultResultLimit;
+      String limitFlag = form.getFirstValue ("limit");
+      if ( limitFlag != null ) 
+      {
+        try {
+          lmt = Integer.valueOf(limitFlag);
+          
+        } catch (NumberFormatException e) 
+        {
+          throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Value of parameter 'limit' can only be integers.");
+        }
+      }
       
       typeVal = (String) getRequest().getAttributes().get("type");
       this.type = null;
@@ -129,7 +143,7 @@ public class NeighborhoodResource extends BaseResource {
       {
         graph = OntGraph.getAllEdges(inputStr, kbId,inputType, getOntoquestContext());
       } else {
-        graph = OntGraph.get(inputStr, type, kbId,attributes, inputType, getOntoquestContext());
+        graph = OntGraph.get(inputStr, type, kbId,attributes, inputType, getOntoquestContext(), lmt);
       }
       long t2 = Calendar.getInstance().getTimeInMillis();
       
@@ -170,7 +184,7 @@ public class NeighborhoodResource extends BaseResource {
     }
     rs.close();
 
-    graph = new OntGraph(edgeSet);
+    graph = new OntGraph(edgeSet, false);
   }
 
   
@@ -196,7 +210,7 @@ public class NeighborhoodResource extends BaseResource {
     }
     rs.close();
 
-    graph = new OntGraph(edgeSet);
+    graph = new OntGraph(edgeSet,false);
   }
 
   private void getAllPartOfGraph(String term, int kbid, Context c, boolean includingEquivalentClass) throws OntoquestException
@@ -221,7 +235,7 @@ public class NeighborhoodResource extends BaseResource {
     }
     rs.close();
 
-    graph = new OntGraph(edgeSet);
+    graph = new OntGraph(edgeSet,false);
   }
   
   private void getAllSubClassGraph(String term, int kbid, Context c, boolean includingEquivalentClass) throws OntoquestException
@@ -246,7 +260,7 @@ public class NeighborhoodResource extends BaseResource {
     }
     rs.close();
 
-    graph = new OntGraph(edgeSet);
+    graph = new OntGraph(edgeSet, false);
   }
   
   
@@ -263,6 +277,11 @@ public class NeighborhoodResource extends BaseResource {
       d.appendChild(succElem);
       Element dataElem = d.createElement("data");
       succElem.appendChild(dataElem);
+      
+      // create the flag 
+      Element flagElem = d.createElement("truncatedResults");
+      flagElem.appendChild(d.createTextNode(graph.isTruncated()?"true":"false"));
+      succElem.appendChild(flagElem);
       
       if (graph != null) { // matched
         Element classNodeElem = graph.toXml(d);
