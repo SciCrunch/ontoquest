@@ -817,8 +817,6 @@ $BODY$
   LANGUAGE plpgsql;
 
 
-
-
 CREATE OR REPLACE FUNCTION update_equivalent_class_group(thekbid integer)
   RETURNS void AS
 $BODY$
@@ -920,11 +918,26 @@ BEGIN
 
     perform move_equivalent_class_edges(thekbid);
 
+    RAISE NOTICE 'Updating labels for merged nodes.';
+    
+    update  graph_nodes_all n 
+      set label = (select n2.label from graph_edges_all v, property p, graph_nodes_all n2 
+                   where v.kbid=thekbid and v.rid1 = n.rid and v.rtid1=n.rtid and p.id = v.pid and p.name ='label' and n2.label <> n.label 
+                         and n2.rid = v.rid2 and n2.rtid = v.rtid2 )
+    where n.kbid=thekbid and n.name = n.label
+        and exists ( select 1 from graph_edges_all v, property p, graph_nodes_all n2 
+              where v.kbid=thekbid and v.rid1 = n.rid and v.rtid1=n.rtid and p.id = v.pid and p.name ='label' and n2.rid = v.rid2 and n2.rtid = v.rtid2 and n2.label <> n.label);
+
     RAISE NOTICE 'Done merging equivalent classes.';
     
 END;
 $BODY$
-  LANGUAGE plpgsql;
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
+
+
+  
 /*
   Transform an owl knowledge base to a graph easy to view. Node table as 6 columns: rid, rtid, name, label, kbid, is_anonymous.
   Node name is class name, e.g. sao1065676773. Node label is the value of rdfs:label, e.g. hippocampus.
