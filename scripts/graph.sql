@@ -923,7 +923,7 @@ BEGIN
     update  graph_nodes_all n 
       set label = (select n2.label from graph_edges_all v, property p, graph_nodes_all n2 
                    where v.kbid=thekbid and v.rid1 = n.rid and v.rtid1=n.rtid and p.id = v.pid and p.name ='label' and n2.label <> n.label 
-                         and n2.rid = v.rid2 and n2.rtid = v.rtid2 )
+                         and n2.rid = v.rid2 and n2.rtid = v.rtid2 limit 1)
     where n.kbid=thekbid and n.name = n.label
         and exists ( select 1 from graph_edges_all v, property p, graph_nodes_all n2 
               where v.kbid=thekbid and v.rid1 = n.rid and v.rtid1=n.rtid and p.id = v.pid and p.name ='label' and n2.rid = v.rid2 and n2.rtid = v.rtid2 and n2.label <> n.label);
