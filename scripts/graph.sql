@@ -65,6 +65,8 @@ create table graph_edges_all (
   rid2 integer NOT NULL,
   rtid2 integer NOT NULL,
   kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE,
+  org_rid1 integer, -- The original start node of this edge, if the edge was moved from an equivalent class.
+  org_rid2 integer, -- The original start node of this edge, if the edge was moved from an equivalent class. We assume the rtids are always the same between the old and the new node.
   derived boolean default false,
   hidden boolean default false,
   restriction_type char(1),
@@ -76,6 +78,9 @@ create table graph_edges_all (
   ,foreign key (rid2, rtid2) references graph_nodes_all(rid, rtid) MATCH FULL
       ON UPDATE no action ON DELETE CASCADE
 ) with oids;
+
+COMMENT ON COLUMN graph_edges_all.org_rid1 IS 'The original start node of this edge, if the edge was moved from an equivalent class.';
+COMMENT ON COLUMN graph_edges_all.org_rid2 IS 'The original start node of this edge, if the edge was moved from an equivalent class. We assume the rtids are always the same between the old and the new node.';
 
 -- create index on graph_edges
 CREATE INDEX edge_id1 ON graph_edges_all (rid1,rtid1, is_obsolete, kbid);
@@ -290,12 +295,6 @@ CREATE OR REPLACE FUNCTION compute_label_from_graph(theRid INTEGER, theRtid INTE
     return NULL;
   END;
 $$ LANGUAGE plpgsql;
-
-
-
-
-
-
 
 -------------------------------------
 
@@ -767,6 +766,7 @@ BEGIN
     FOR rep_id, member_id in SELECT e.rid, e.ridm from equivalentclassgroup e where e.kbid = thekbid
     LOOP
 
+      -- delete member node edges that the representitive node already have.
       delete from graph_edges_all ge
       where ge.rid1 = member_id and ge.kbid = thekbid and ge.rtid1=class_rtid and ge.pid <> eq_pid and
          exists ( select 1 from graph_edges_all gei 
@@ -786,7 +786,8 @@ BEGIN
 
       -- move edges member -> node to rep -> node
       update graph_edges_all ge
-              set rid1 = rep_id
+              set org_rid1 = member_id,
+                  rid1 = rep_id
       where ge.rid1 = member_id and ge.rtid1=class_rtid and ge.kbid = thekbid and ge.pid <> eq_pid and
          not exists ( select 1 from graph_edges_all gei 
                       where gei.rid1=rep_id and gei.rtid1=class_rtid 
@@ -796,7 +797,8 @@ BEGIN
 
       -- move edges nodeX -> member  to nodeX -> rep  
       update graph_edges_all ge
-              set rid2 = rep_id
+              set rid2 = rep_id,
+                  org_rid2=member_id
       where ge.rid2 = member_id and ge.rtid2=class_rtid and ge.kbid = thekbid and ge.pid <> eq_pid and
          not exists ( select 1 from graph_edges_all gei 
                       where gei.rid2=rep_id and gei.rtid2=class_rtid 
@@ -814,7 +816,8 @@ BEGIN
     
 END;
 $BODY$
-  LANGUAGE plpgsql;
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
 
 
 CREATE OR REPLACE FUNCTION update_equivalent_class_group(thekbid integer)
@@ -1961,6 +1964,142 @@ $BODY$
   LANGUAGE plpgsql
   COST 100
   ROWS 2000;
+
+
+CREATE OR REPLACE FUNCTION get_closure_by_rid(therid integer, thertid integer, property_name character varying, kb integer, incoming boolean, includes_equivalent_class boolean)
+  RETURNS SETOF edge2 AS
+$BODY$
+  
+  DECLARE
+    -- element of ancestor array: rid, rtid, init_depth (0)
+    pid_array integer[];
+    pid_equ_array integer[];
+    rec RECORD;
+    rec_i RECORD;
+
+    v_pid integer;
+    v_eq_pid integer;   
+  BEGIN
+
+     select rid into v_pid from graph_nodes where label = property_name and kbid=kb and rtid=15 limit 1; --property where name = property_name;
+     if v_pid is null then
+       raise 'Property % not found in property table.', pid;
+     end if;
+     
+      pid_array :=array(
+       (select rid from graph_nodes p where p.label =property_name  and p.kbid =kb and p.rtid=15)
+       union
+       (with recursive include_subproperty (childid, parentid) as (
+         select childid, parentid from subpropertyof sp , graph_nodes p where p.label =property_name and p.rtid=15
+            and sp.parentid = p.rid and p.kbid =kb
+        union 
+         select p.childid, p.parentid    
+         from include_subproperty sp, subpropertyof p
+         where p.parentid = sp.childid
+      )
+      select ss.childid as id from include_subproperty ss ) );
+
+      select id into v_eq_pid from property where name = 'equivalentClass';
+
+      if includes_equivalent_class then 
+         pid_equ_array := pid_array || v_eq_pid;
+      else 
+         pid_equ_array := pid_array ;
+      end if;
+      
+      raise notice 'pid arrary is %, equivalentClass pid is %', pid_equ_array, v_eq_pid;
+
+      if incoming then 
+
+      for rec in 
+      with recursive incoming_enclosure ( rid1, rtid1, rid2, rtid2, pid , depth 
+      ) as (
+       select e.rid1, e.rtid1,e.rid2, e.rtid2, e.pid , 1
+       from graph_edges e, 
+           ( (select nn.rid, nn.rtid from graph_nodes nn where nn.rid=theRid and nn.rtid=theRtid and nn.kbid=kb) 
+            union
+             ( select g.rid, n1.rtid from graph_nodes n1 join equivalentclassgroup g 
+                on n1.rid = g.ridm where n1.rid=theRid and n1.rtid=theRtid and n1.kbid=kb))  n 
+       where n.rtid=1 and ( e.rid1 <> e.rid2 or e.rtid1 <> e.rtid2 ) 
+            and e.rid2 = n.rid and e.rtid2 = n.rtid and e.pid =any ( pid_equ_array) 
+      union 
+       select ge.rid1, ge.rtid1, ge.rid2, ge.rtid2, ge.pid , ie.depth+1
+       from incoming_enclosure ie, graph_edges ge
+       where ie.rid1 = ge.rid2 and ie.rtid1 = ge.rtid2 and
+          ( ge.rid1 <> ge.rid2 or ge.rtid1 <> ge.rtid2 ) and ge.pid = any ( pid_equ_array ) and ie.depth <200
+      )
+      select ie.rid1, ie.rtid1,n1.label as name1, ie.rid2, ie.rtid2,
+        n2.label as name2, ie.pid, p0.name as pname  from incoming_enclosure ie, graph_nodes n1, graph_nodes n2, property p0
+      where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id 
+          order by ie.depth, ie.rid2, ie.rid1
+      LOOP
+
+         if includes_equivalent_class then 
+           return next rec;
+           for rec_i in select e.rid2, e.rtid2, n2.label as name1 , e.rid1, e.rtid1, n1.label as name2 , e.pid,
+            'equivalentClass'::TEXT as pname from graph_edges e, graph_nodes n1, graph_nodes n2
+             where e.rid1 = rec.rid1 and e.rtid1 = rec.rtid1 and e.kbid = kb and n1.rid= e.rid1 and e.pid = v_eq_pid
+                 and n1.rtid=e.rtid1 and n2.rid = e.rid2 and n2.rtid = e.rtid2 
+           LOOP
+ 	           return next rec_i;	
+           end loop; 
+         else if rec.rtid1 not in (3,8,9) then 
+             return next rec;
+            end if;
+         end if;
+
+      END LOOP;
+
+    else     -- outgoing
+      for rec in 
+      with recursive incoming_enclosure ( rid1, rtid1, rid2, rtid2, pid, depth
+        ) as (
+       select e.rid1, e.rtid1,e.rid2, e.rtid2, e.pid, 1
+       from graph_edges e, 
+           ( (select nn.rid, nn.rtid from graph_nodes nn where nn.rid=theRid and nn.rtid=theRtid and nn.kbid=kb) 
+            union
+             ( select g.rid, n1.rtid from graph_nodes n1 join equivalentclassgroup g 
+                on n1.rid = g.ridm where n1.rid=theRid and n1.rtid=theRtid and n1.kbid=kb))  n 
+       where n.rtid=1 and ( e.rid1 <> e.rid2 or e.rtid1 <> e.rtid2 ) 
+            and  e.rid1 = n.rid and e.rtid1 = n.rtid and e.pid =any ( pid_equ_array) 
+      union  
+       select ge.rid1, ge.rtid1, ge.rid2, ge.rtid2, ge.pid, ie.depth+1
+       from incoming_enclosure ie, graph_edges ge
+       where  ie.rid2 = ge.rid1 and ie.rtid2 = ge.rtid1  
+          and ( ge.rid1 <> ge.rid2 or ge.rtid1 <> ge.rtid2 )  and ie.depth <200 and ge.pid = any ( pid_equ_array )
+      )
+      select ie.rid1, ie.rtid1,n1.label as name1, ie.rid2, ie.rtid2,
+        n2.label as name2, ie.pid, p0.name as pname  from incoming_enclosure ie, graph_nodes n1, graph_nodes n2, property p0
+      where n1.rid= ie.rid1 and n1.rtid=ie.rtid1 and n2.rid = ie.rid2 and n2.rtid = ie.rtid2 and ie.pid = p0.id 
+         order by ie.depth, ie.rid1, ie.rid2
+      LOOP
+         if includes_equivalent_class then 
+           return next rec;
+           for rec_i in select e.rid2, e.rtid2, n2.label as name1 , e.rid1, e.rtid1, n1.label as name2 , e.pid,
+            'equivalentClass'::TEXT as pname from graph_edges e, graph_nodes n1, graph_nodes n2
+             where e.rid2 = rec.rid1 and e.rtid2 = rec.rtid1 and e.kbid = kb and n1.rid= e.rid1 and e.pid = v_eq_pid
+                 and n1.rtid=e.rtid1 and n2.rid = e.rid2 and n2.rtid = e.rtid2 
+           LOOP
+ 	           return next rec_i;	
+           end loop; 
+         else if rec.rtid2 not in (3,8,9) then
+             return next rec;
+           end if;
+         end if;
+
+      END LOOP;
+
+    end if;
+
+    return;
+END;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100
+  ROWS 2000;
+
+
+
 
 
 create or replace function rm_duplicate_synonym (thekbid integer)
