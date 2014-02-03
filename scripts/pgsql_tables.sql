@@ -362,7 +362,7 @@ CREATE INDEX eq_prop_idx3 ON equivalentproperty (kbid);
 -- ********************************
 CREATE TABLE individual (
   id serial PRIMARY KEY,
-  name text NOT NULL,
+  name text,   -- removed the not null constraint - CJ
   hashcode integer,
   is_owl boolean default true, -- is owl individual or rdfs individual?
   nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
