@@ -121,7 +121,8 @@ public abstract class BaseBean {
 
 	private static synchronized void setSynonymPropertySet() {
 		synonymPropertySet = new HashSet<String>();
-		synonymPropertySet.add("synonym"); 
+	  synonymPropertySet.add("synonym"); 
+		synonymPropertySet.add("has_exact_synonym"); 
 		synonymPropertySet.add("abbrev");
 		synonymPropertySet.add("hasExactSynonym"); 
 		synonymPropertySet.add("hasRelatedSynonym"); 
