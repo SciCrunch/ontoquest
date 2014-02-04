@@ -16,11 +16,13 @@ import edu.sdsc.ontoquest.ResourceSetMetaData;
 import edu.sdsc.ontoquest.query.Utility;
 import edu.sdsc.ontoquest.query.Variable;
 
+import java.sql.Timestamp;
+
 /**
  * A resource set wrapping around a java.sql.ResultSet object. When the SQLResourceSet
  * is instantiated, the actual data (rows) are still in the underlying database
  * and the wrapped java.sql.ResultSet is the handle to fetch the rows.
- * 
+ *
  * @version $Id: DbResourceSet.java,v 1.1 2010-10-28 06:30:09 xqian Exp $
  *
  */
@@ -134,6 +136,19 @@ public class DbResourceSet extends AbstractResourceSet {
           "Unable to get long value for attribute " + columnIdx, e);
     }
   }
+
+  /**
+   * @see edu.sdsc.ontoquest.ResultSet#getTimestamp(int)
+   */
+  public Timestamp getTimestamp(int columnIdx) throws OntoquestException {
+    try {
+      return rsList.get(currentRSIdx).getTimestamp(columnIdx);
+    } catch (SQLException e) {
+      throw new OntoquestException(OntoquestException.Type.BACKEND, 
+          "Unable to get timestamp value for attribute " + columnIdx, e);
+    }
+  }
+
 
   /**
    * @see edu.sdsc.ontoquest.ResultSet#getMetaData()
