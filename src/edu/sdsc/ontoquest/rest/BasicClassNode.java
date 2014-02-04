@@ -12,6 +12,32 @@ public class BasicClassNode extends BaseBean {
   private int rtid;
   private String label; // rdfs:label
   private String name; // class name, e.g. birnlex_802
+  private String URI;
+
+  public BasicClassNode () 
+  {
+    label=null;
+    name = null;
+    URI = null;
+  }
+  public BasicClassNode (int rid, int rtid, String label, String name, String URI) 
+  {
+    this.rid = rid;
+    this.rtid = rtid;
+    this.label = label;
+    this.name = name;
+    this.URI = URI;
+  }
+
+  public BasicClassNode (int rid, int rtid) 
+  {
+    this.rid = rid;
+    this.rtid = rtid;
+    this.label = null;
+    this.name = null;
+    this.URI = null;
+  }
+
 
   /**
    * @return the rid
@@ -61,6 +87,19 @@ public class BasicClassNode extends BaseBean {
   public void setName(String name) {
     this.name = name;
   }
+  
+  public void setURI (String uri) 
+  {
+    this.URI = uri;
+  }
+  
+  public String getURI () {return URI;}
+  
+  /**
+   * Get the internal rid and rtid as a combined string in the format of "rid-rtid". For example, "123456-1".
+   * @return
+   */
+  public String getId() {return rid+"-"+rtid ;}
 
   /* (non-Javadoc)
    * @see edu.sdsc.ontoquest.rest.BaseBean#toXml(org.w3c.dom.Document)
