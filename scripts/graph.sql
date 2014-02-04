@@ -310,6 +310,7 @@ CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursiv
   
   Steps: 
   1) First, check if the resource has a rdfs:label property. If so, use the value of rdfs:label as the resource's label. Return true.
+  1.2) Second,  check if resource has a 'IAO_0000589' property, This is "OBO foundry unique label".
   2) Otherwise, check if the resource has a name. If so, use the name as label. Return true.
   3) For anonymous classes, check if the resources used in class definition have labels or not. If yes, set the label depending on class type.
   Return true. If not, decide if we need to set the labels of member classes, depending on the isRecursive flag.
@@ -327,6 +328,15 @@ CREATE OR REPLACE FUNCTION set_label(theRid INTEGER, theRtid INTEGER, isRecursiv
     -- First, check if the resource has a rdfs:label property. If so, use the value of rdfs:label as the resource's label. Return true.
     FOR rec IN select n.name from graph_nodes_all n, graph_edges_all r, property p
       where r.rid1 = theRid and r.rtid1 = theRtid and r.pid = p.id and p.name = 'label' and p.is_system = true
+      and r.rid2 = n.rid and r.rtid2 = n.rtid
+    LOOP
+      update graph_nodes_all set label = rec.name where rid = theRid and rtid = theRtid;
+      return rec.name;
+    END LOOP;
+
+    -- Second,  check if resource has a 'IAO_0000589' property, This is "OBO foundry unique label".
+    FOR rec IN select n.name from graph_nodes_all n, graph_edges_all r, property p
+      where r.rid1 = theRid and r.rtid1 = theRtid and r.pid = p.id and p.name = 'IAO_0000589' 
       and r.rid2 = n.rid and r.rtid2 = n.rtid
     LOOP
       update graph_nodes_all set label = rec.name where rid = theRid and rtid = theRtid;
