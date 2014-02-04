@@ -20,15 +20,19 @@ import edu.sdsc.ontoquest.db.functions.GetNeighbors;
 import edu.sdsc.ontoquest.db.functions.GetOntologyURL;
 import edu.sdsc.ontoquest.query.Utility;
 
+import edu.sdsc.ontoquest.query.Variable;
+
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+
+import java.util.ArrayList;
 
 /**
  * @version $Id: ClassNode.java,v 1.6 2013-10-29 23:52:45 jic002 Exp $
  *
  */
-public class ClassNode extends BaseBean {
+public class ClassNode extends BasicClassNode {
 
   protected static String interanIdAttrName = "InternalId";
 
@@ -167,7 +171,7 @@ public class ClassNode extends BaseBean {
 
 		for (String compositeID : resultMap.keySet()) {
 			resultMap.get(compositeID).setName(nameMap.get(compositeID));
-			resultMap.get(compositeID).setUrl(urlMap.get(compositeID));
+			resultMap.get(compositeID).setURI(urlMap.get(compositeID));
 		}
 
 		return resultMap;
@@ -368,14 +372,16 @@ public class ClassNode extends BaseBean {
 		matchedTerms.toArray(terms);
 		return getByLabel(terms, kbId, context);
 	}
+  /* The following 4 attributes are removed since we extend this class from BasicClassNode now. 
 	private int rid;
 	private int rtid;
 	private String label; // rdfs:label
 	private String name; // class name, e.g. birnlex_802
+  */
   
   private String definition;
 
-	private String url; // ontology url
+//	private String url; // ontology url  removed to use uri of the parent class
 
 	private List<String> comments;
 	private List<String> synonyms;
@@ -430,6 +436,15 @@ public class ClassNode extends BaseBean {
 
 	public static HashMap<String, ClassNode> getByLabel(String[] terms, int kbId,
 			Context context) throws OntoquestException {
+    /* include all properties, no exclude properties. Include synonyms. 
+     * only outgoing edges, exclude hidden edges, not just classes, one level deep,
+     * don't include subproperties.
+     * 
+     * The logic of this function is 
+     * 1. search this term in the name and lable field of graph_node table (case-insensitive search).
+     * 2. finde nodes that has this term as synonyms.
+     * 3. get out-going properties of the nodes returned from 1 and 2.
+     * */
 		OntoquestFunction<ResourceSet> f = new GetNeighbors(terms, kbId,
 				getClassProperties, null, true, GetNeighbors.EDGE_OUTGOING, true,
 				false, 1, false);
@@ -455,6 +470,130 @@ public class ClassNode extends BaseBean {
     this.definition = definition;
 	}
 
+  /**
+   * Construct an instance from database
+   * @param rid rid of the class in database
+   * @param kbid 
+   * @param context context for database connection
+   */
+  public ClassNode (int kbid, int rid, Context context) throws OntoquestException
+  {
+    super(rid,1);
+
+    this.comments = new ArrayList<String>(5);
+    this.synonyms = new ArrayList<String>(5);
+    this.otherProperties = new ArrayList<String[]> (20);
+    this.superclasses = new ArrayList<SimpleClassNode> (5);
+    
+    // first check if this rid is a member in the equivalent class group.
+    // set the representive class id. -1 mean rid is not a member. any possitive value
+    // means rid is in an equivalent class group and the rep node id is rrid
+ /*   int rrid = -1;  
+    String sql = "select n.rid from equivalentclassgroup n where n.kbid = " +
+                 kbid + " and ridm = " + rid;
+    
+    List<Variable> varList = new ArrayList<Variable>(1);
+    varList.add(new Variable(1));
+    
+    ResourceSet r = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when check if a class node is a member of equivalent class group.",-1);
+    while (r.next()) {
+      rrid = r.getInt(1);
+    }
+    r.close();
+    
+    if (rrid == -1)  // rid is not in an equivalent class group
+    {  */
+      // get the node infor first
+      String sql = "select label, name, uri from graph_nodes where kbid = " +kbid + 
+             " and rid ="+ rid + " and rtid=1";
+
+      List<Variable> varList = new ArrayList<Variable>(3);
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      
+      ResourceSet r = DbUtility.executeSQLQuery(sql, context, varList, null, 
+          "Error occured when getting class node info for node " + rid,-1);
+      while (r.next()) {
+        setLabel( r.getString(1));
+        setName ( r.getString(2));
+        setURI(r.getString(3));
+      }
+      r.close();
+      if ( getName() == null ) 
+        throw new OntoquestException ("Class id " + rid + " not found in knowledge base " + kbid);
+      
+      // get properties 
+      sql = "select p.name, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
+      "from graph_edges e join graph_nodes n2 on n2.rid = e.rid2 and n2.rtid = e.rtid2 " + 
+      " join property p on p.id = e.pid left outer join graph_nodes n1 on " + 
+      " n1.rid = e.org_rid1 and n1.rtid = 1 " + 
+      "where e.rid1 = 1119328 and e.org_rid1 is null and e.rtid1 = 1 and (not e.derived) and e.kbid= " + kbid +
+      " union select p.name, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
+      "from graph_edges e join graph_nodes n2 on n2.rid = e.rid2 and n2.rtid = e.rtid2 " + 
+      "join property p on p.id = e.pid left outer join graph_nodes n1 on " + 
+      "n1.rid = e.org_rid1 and n1.rtid = 1 " + 
+      "where e.org_rid1 = "+ rid + " and e.rtid1 = 1 and (not e.derived) and e.kbid=" + kbid ;
+
+      varList = new ArrayList<Variable>(6);
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+
+      ResourceSet rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
+          "Error occured when getting properties of class node " + rid,-1);
+      while (rs.next()) {
+        String prop = rs.getString(1);
+        String val = rs.getString(3);
+        if (val == null || val.length() == 0 || prop.equals("label"))
+          continue;
+       // int n2rid = rs.getInt(4);
+       // String term = rs.getString(2);
+
+        //populating properties
+        if (getDefinitionPropertySet().contains(prop)) { // a definition edge
+          comments.add(val+" ["+prop+"]");
+        } else if (prop.equals(definitionProperty)) {
+           setDefinition(val);
+        } else if (getSynonymPropertySet().contains(prop)){ // synonym edge
+            synonyms.add(val);
+        } else if (rs.getInt(5) == 13) { // other properties, 13 means literal.
+          otherProperties.add(new String[]{prop, val});
+        }
+      }
+      rs.close();
+//    }
+
+    // get subclass info
+    sql = "select n.rid, n.rtid, n.name, n.label, n.uri from subclassof s join " + 
+            " graph_nodes n on s.parentid = n.rid where n.rtid=1 and s.kbid = " + kbid + 
+            " and s.childid = " + rid;
+
+      varList = new ArrayList<Variable>(5);
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+      varList.add(new Variable(1));
+
+    rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting parent classes of class node " + rid,-1);
+    while (rs.next()) {
+      superclasses.add(new SimpleClassNode (rs.getInt(1),
+                                            rs.getInt(2),
+                                            rs.getString(3),  //name
+                                            rs.getString(4),  //Label 
+                                            rs.getString(5)));  //URI
+    }
+    rs.close();
+      
+    
+  }
+
 	@Override
 	public boolean equals(Object o) {
 		if (!(o instanceof ClassNode)) 
@@ -471,43 +610,18 @@ public class ClassNode extends BaseBean {
 		return comments;
 	}
 
-	public String getId() {
-		return generateId(rid, rtid);
-	}
-
-	/**
+	/*
 	 * @return the label
 	 */
-	public String getLabel() {
+/*	public String getLabel() {
 		return label;
-	}
-
-	/**
-	 * @return the name
-	 */
-	public String getName() {
-		return name;
-	}
+	} */
 
 	/**
 	 * @return the properties
 	 */
 	public List<String[]> getOtherProperties() {
 		return otherProperties;
-	}
-
-	/**
-	 * @return the rid
-	 */
-	public int getRid() {
-		return rid;
-	}
-
-	/**
-	 * @return the rtid
-	 */
-	public int getRtid() {
-		return rtid;
 	}
 
 	public List<SimpleClassNode> getSuperclasses() {
@@ -525,7 +639,7 @@ public class ClassNode extends BaseBean {
 	 * @return the url
 	 */
 	public String getUrl() {
-		return url;
+		return getURI();
 	}
   
   public String getDefinition() 
@@ -547,22 +661,8 @@ public class ClassNode extends BaseBean {
 
 	public void setId(String id) throws OntoquestException {
 		int[] ontoId = parseId(id);
-		rid = ontoId[0];
-		rtid = ontoId[1];
-	}
-
-	/**
-	 * @param label the label to set
-	 */
-	public void setLabel(String label) {
-		this.label = label;
-	}
-
-	/**
-	 * @param name the name to set
-	 */
-	public void setName(String name) {
-		this.name = name;
+		setRid( ontoId[0]);
+		setRtid(ontoId[1]);
 	}
 
 	/**
@@ -572,19 +672,6 @@ public class ClassNode extends BaseBean {
 		this.otherProperties = otherProperties;
 	}
 
-	/**
-	 * @param rid the rid to set
-	 */
-	public void setRid(int rid) {
-		this.rid = rid;
-	}
-
-	/**
-	 * @param rtid the rtid to set
-	 */
-	public void setRtid(int rtid) {
-		this.rtid = rtid;
-	}
 
 	public void setSuperclasses(List<SimpleClassNode> superclasses) {
 		this.superclasses = superclasses;
@@ -600,9 +687,9 @@ public class ClassNode extends BaseBean {
 	/**
 	 * @param url the url to set
 	 */
-	public void setUrl(String url) {
-		this.url = url;
-	}
+/*	public void setUrl(String url) {
+     setURI(url);
+	} */
 
 	@Override
 	public Element toXml(Document doc) {
@@ -611,7 +698,7 @@ public class ClassNode extends BaseBean {
 		Element idElem = doc.createElement("id");
 		e.appendChild(idElem);
     idElem.setAttribute(interanIdAttrName, getId());
-		idElem.appendChild(doc.createTextNode(name));
+		idElem.appendChild(doc.createTextNode(getName()));
 
 		Element nameElem = doc.createElement("name");
 		e.appendChild(nameElem);
