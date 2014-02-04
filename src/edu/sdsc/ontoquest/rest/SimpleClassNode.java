@@ -133,12 +133,14 @@ public class SimpleClassNode extends BasicClassNode {
 	private List<String[]> properties; // String[0] -- property name, String[1] -- property value
 
 	public SimpleClassNode(int rid, int rtid, String name, String label, List<String[]> properties) {
-		setRid(rid);
-		setRtid(rtid);
-		setLabel(label);
-		setName(name);
+    super(rid,rtid,label,name,null);
 		setProperties(properties);		
 	}
+
+  public SimpleClassNode(int rid, int rtid, String name, String label, String URI) {
+    super(rid,rtid,label,name,URI);
+    properties = null;    
+  }
 
 	public SimpleClassNode(String id, String name, String label, List<String[]> properties) 
 			throws OntoquestException {
@@ -167,7 +169,8 @@ public class SimpleClassNode extends BasicClassNode {
 	@Override
 	public Element toXml(Document doc) {
 		Element e = doc.createElement("class");
-
+    e.setAttribute("about", getURI());
+    
 		Element idElem = doc.createElement("id");
 		e.appendChild(idElem);
     idElem.setAttribute(ClassNode.interanIdAttrName, ClassNode.generateId(getRid(), getRtid()));
