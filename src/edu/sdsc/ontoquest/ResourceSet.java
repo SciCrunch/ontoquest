@@ -1,11 +1,13 @@
 package edu.sdsc.ontoquest;
 
+import java.sql.Timestamp;
+
 /**
  * Interface of data iterator. This interface defines how to fetch
  * result one by one. The underlying data source may be a relational
  * database, data file or in-memory structure. This interface encapsulates
  * the actual data format and storage.
- * 
+ *
  * @version $Id: ResourceSet.java,v 1.1 2010-10-28 06:30:00 xqian Exp $
  */
 public interface ResourceSet extends Closeable {
@@ -40,4 +42,7 @@ public interface ResourceSet extends Closeable {
   public String getString(int columnIdx) throws OntoquestException;
   
   public Object getObject(int columnIdx) throws OntoquestException;
+  
+  public Timestamp getTimestamp(int columnIdx) throws OntoquestException;
+  
 }
