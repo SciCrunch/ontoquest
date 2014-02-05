@@ -13,12 +13,19 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import edu.sdsc.ontoquest.BasicFunctions;
+import edu.sdsc.ontoquest.Context;
 import edu.sdsc.ontoquest.OntoquestException;
+import edu.sdsc.ontoquest.ResourceSet;
 import edu.sdsc.ontoquest.db.DbBasicFunctions;
+import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Utility;
+import edu.sdsc.ontoquest.query.Variable;
 import edu.sdsc.ontoquest.rest.BaseBean.InputType;
 import edu.sdsc.ontoquest.rest.BaseBean.NeighborType;
 import edu.sdsc.ontoquest.rest.BaseBean.SiblingsType;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @version $Id: ClassNodeResource.java,v 1.3 2013-06-21 22:28:27 jic002 Exp $
@@ -26,7 +33,12 @@ import edu.sdsc.ontoquest.rest.BaseBean.SiblingsType;
  */
 public class ClassNodeResource extends BaseResource {
 
-	HashMap<String, ClassNode> classNodes = null;
+	
+  /** 
+   * key of the map is a composite id in a string fromat generated from 
+   * funnction generateId(rid, rtid). Example is '1233444-1'
+   */
+  private HashMap<String, ClassNode> classNodes = null;
 
 	@Override
 	protected void doInit() throws ResourceException {
@@ -89,7 +101,7 @@ public class ClassNodeResource extends BaseResource {
 			n.getSuperclasses().add(
 					new SimpleClassNode(edge.getRid2(), edge.getRtid2(),
                    ClassNode.generateExtId(edge.getRid2(),edge.getRtid2(), getOntoquestContext()),
-                  edge.getLabel2(), null));
+                  edge.getLabel2(), (List<String[]>)null));
 		}
 	}
 
@@ -139,7 +151,9 @@ public class ClassNodeResource extends BaseResource {
 		String term = (String)getRequest().getAttributes().get("term");
 		if (term != null) {
 			term = Reference.decode(term);
-			return ClassNode.getByLabel(term, kbId, getOntoquestContext());
+      
+		  getClassesFromTerm(kbId, term);
+			// return ClassNode.getByLabel(term, kbId, getOntoquestContext());
 		}
 
 		String query = (String)getRequest().getAttributes().get("query");
@@ -148,7 +162,7 @@ public class ClassNodeResource extends BaseResource {
 			return ClassNode.search(query, getRequest().getAttributes(), kbId, getOntoquestContext());
 		}
 
-		return null;
+		return classNodes;
 
 	}
 
@@ -185,4 +199,40 @@ public class ClassNodeResource extends BaseResource {
 			return toErrorXml();
 		}
 	}
+  
+  /**
+   * Get a collection of classes that related to the search term. Result is stored in 
+   *  this.classNodes.
+   * 
+   * @param KBid
+   * @param term
+   */
+  private void getClassesFromTerm(int KBid, String term) throws OntoquestException
+  {
+    String lterm= term.toLowerCase();
+    
+    String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.kbid = " +
+                 KBid + " and ( lower(name) = '" + lterm + "' or lower(label) = '" + lterm + 
+                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges r1, property p " +
+                 "where n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
+      KBid + " and ( lower(n1.name) = '" + 
+      lterm + "' or lower(n1.label) = '" + lterm + "') and p.name in ('prefLabel', 'label', 'synonym', 'abbrev', 'hasExactSynonym', 'hasRelatedSynonym', "+
+    "'acronym', 'taxonomicCommonName', 'ncbiTaxScientificName', 'ncbiTaxGenbankCommonName', 'ncbiTaxBlastName', 'ncbiIncludesName', 'ncbiInPartName', 'hasNarrowSynonym', 'misspelling', 'misnomer', 'hasBroadSynonym')"; 
+    
+    List<Variable> varList = new ArrayList<Variable>(2);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    
+    ResourceSet r = DbUtility.executeSQLQuery(sql, getOntoquestContext(), varList, null, "Error occured when getting rids of the search term " + term,-1);
+    while (r.next()) {
+      int rid1 = r.getInt(1);
+      int rtid1 = r.getInt(2);
+      
+      classNodes = new HashMap<String,ClassNode>();
+      classNodes.put(ClassNode.generateId(rid1, rtid1), new ClassNode(KBid, rid1, getOntoquestContext()));
+    }
+    r.close();
+    
+  }
+  
 }
