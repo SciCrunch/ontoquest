@@ -16,6 +16,9 @@ import edu.sdsc.ontoquest.db.functions.GetNeighbors;
 import edu.sdsc.ontoquest.db.functions.RunSQL;
 import edu.sdsc.ontoquest.query.Variable;
 
+import java.sql.Timestamp;
+import org.semanticweb.owlapi.model.IRI;
+
 /**
  * @version $Id: Ontology.java,v 1.2 2013-06-21 22:28:27 jic002 Exp $
  *
@@ -23,6 +26,8 @@ import edu.sdsc.ontoquest.query.Variable;
 public class Ontology extends BaseBean {
 
   int rid, rtid; 
+  
+  // kbName
   String name = "";
   String title = "";
   String subjectKeywords = "";
@@ -33,17 +38,67 @@ public class Ontology extends BaseBean {
   List<String> contributors = new LinkedList<String>();
   String dateCreated = "";
   Context context;
+  List<Ontology> importedOntologies;
   
-  public Ontology(int rid, int rtid, String name, Context context) {
+  Timestamp loadingTime ;
+  IRI versionIRI;
+  private int kbid;
+  
+  public Ontology(int rid, int rtid, String name, Context context) throws OntoquestException
+  {
     this.rid = rid;
     this.rtid = rtid;
     this.name = name;
     this.context = context;
+    this.importedOntologies = null;
+
+    // get the loading time and kbid first
+    String sql = "select n.id, n.creation_date from kb n where n.name='"+name+"'";
+    List<Variable> varList = new ArrayList<Variable>(2);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+
+    ResourceSet rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting kb info for " + name,-1);
+    while (rs.next()) {
+      kbid = rs.getInt(1);
+      loadingTime = rs.getTimestamp(2);
+    }
+    rs.close();
+
+    // get other properties from the ontology
+    OntoquestFunction<ResourceSet> f = new GetNeighbors(rid, rtid, 0, 
+        null, null, GetNeighbors.EDGE_OUTGOING, true, false, 0, true);
+    rs = f.execute(context, getVarList8());
+    while (rs.next()) {
+      String prop = rs.getString(8);
+      String value = rs.getString(6);
+      if (prop.equalsIgnoreCase("title")) {
+        setTitle(value);
+      } else if (prop.equalsIgnoreCase("definition")) {
+        setDefinition(value);
+      } else if (prop.equalsIgnoreCase("Contributor")) {
+        getContributors().add(value);
+      } else if (prop.equalsIgnoreCase("Creator")) {
+        getCreators().add(value);
+      } else if (prop.equalsIgnoreCase("versionInfo")) {
+        setVersion(value);
+      } else if (prop.equalsIgnoreCase("createdDate")) {
+        setDateCreated(value);
+      } else if (prop.equalsIgnoreCase("Subject and Keywords")) {
+        setSubject(value);
+      }
+    }
+    rs.close();
+
+  
   }
   
   public static Ontology get(String kbName, Context context) throws OntoquestException {
-    String sql = "select u.id, rt.id as rtid from ontologyuri u, resourcetype rt, kb kb where is_default = true and rt.name = 'ontologyuri' and u.kbid = kb.id and kb.name = '"+kbName+"'";
+    String sql = "select u.id, rt.id as rtid, u.version_iri, u.kbid from ontologyuri u, resourcetype rt, kb kb where is_default = true and rt.name = 'ontologyuri' and u.kbid = kb.id and kb.name = '"+kbName+"'";
     ArrayList<Variable> varList = new ArrayList<Variable>(2);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
     varList.add(new Variable(1));
     varList.add(new Variable(1));
     
@@ -54,7 +109,11 @@ public class Ontology extends BaseBean {
     if (rs.next()) {
       rid = rs.getInt(1);
       rtid = rs.getInt(2);
-      ont = get(rid, rtid, kbName, context);
+      String versionIRI = rs.getString(3);
+      int kbid = rs.getInt(4);
+      ont =new Ontology(rid, rtid, kbName, context);
+      ont.setVersionIRI( IRI.create(versionIRI));
+      
     }
     rs.close();
     
@@ -62,8 +121,9 @@ public class Ontology extends BaseBean {
   }
   
   public static List<Ontology> getAll(Context context) throws OntoquestException {
-    String sql = "select u.id, rt.id as rtid, kb.name from ontologyuri u, resourcetype rt, kb kb where is_default = true and rt.name = 'ontologyuri' and u.kbid = kb.id";
-    ArrayList<Variable> varList = new ArrayList<Variable>(3);
+    String sql = "select u.id, rt.id as rtid, kb.name, u.kbid from ontologyuri u, resourcetype rt, kb kb where is_default = true and rt.name = 'ontologyuri' and u.kbid = kb.id";
+    ArrayList<Variable> varList = new ArrayList<Variable>(4);
+    varList.add(new Variable(1));
     varList.add(new Variable(1));
     varList.add(new Variable(1));
     varList.add(new Variable(1));
@@ -78,7 +138,8 @@ public class Ontology extends BaseBean {
       rid = rs.getInt(1);
       rtid = rs.getInt(2);
       kbName = rs.getString(3);
-      Ontology ont = get(rid, rtid, kbName, context);
+      int kbid = rs.getInt(4);
+      Ontology ont = new Ontology(rid, rtid, kbName,  context);
       results.add(ont);
     }
     rs.close();
@@ -86,7 +147,8 @@ public class Ontology extends BaseBean {
     return results;
   }
 
-  public static Ontology get(int rid, int rtid, String kbName, Context context) throws OntoquestException {
+/*
+  private static Ontology get(int rid, int rtid, String kbName, int kbid, Context context) throws OntoquestException {
     OntoquestFunction<ResourceSet> f = new GetNeighbors(rid, rtid, 0, 
         null, null, GetNeighbors.EDGE_OUTGOING, true, false, 0, true);
     
@@ -115,7 +177,7 @@ public class Ontology extends BaseBean {
     rs.close();
     return ont;
   }
-  
+ */ 
   public static String getURI(String kbName, Context context) throws OntoquestException {
   
   String sqlTemplate = "select uri from ontologyuri, kb kb where kbid = kb.id and kb.name = ':1' and is_default = true";
@@ -173,11 +235,17 @@ public class Ontology extends BaseBean {
       creatorsElem.appendChild(creatorElem);
       creatorElem.appendChild(doc.createTextNode(creator));
     }
+  */  
+    if ( versionIRI != null) {
+      Element versionIRIElem = doc.createElement("versionIRI");
+      e.appendChild(versionIRIElem);
+      versionIRIElem.appendChild(doc.createTextNode(versionIRI.toString()));
+    }
+
+    Element loadingTimeElem = doc.createElement("loadingTime");
+    e.appendChild(loadingTimeElem);
+    loadingTimeElem.appendChild(doc.createTextNode(loadingTime.toString()));
     
-    Element versionElem = doc.createElement("version");
-    e.appendChild(versionElem);
-    versionElem.appendChild(doc.createTextNode(version));
-*/    
     Element formatElem = doc.createElement("format");
     e.appendChild(formatElem);
     formatElem.appendChild(doc.createTextNode(format));
@@ -294,6 +362,16 @@ public class Ontology extends BaseBean {
    */
   public void setVersion(String version) {
     this.version = version;
+  } 
+  
+  public IRI getVersionIRI() 
+  {
+    return this.versionIRI;
+  }
+  
+  public void setVersionIRI(IRI vIRI) 
+  {
+    this.versionIRI = vIRI;
   }
 
   /**
