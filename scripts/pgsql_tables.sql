@@ -882,6 +882,7 @@ CREATE TABLE equivalentclassgroup
   rid bigint,
   ridm bigint,
   kbid integer,
+  rid_is_obsolete boolean,
   CONSTRAINT equivalentclassgroup_pkey PRIMARY KEY (id),
   CONSTRAINT equivalentclassgroup_kbid_fkey FOREIGN KEY (kbid)
       REFERENCES kb (id) MATCH SIMPLE
@@ -893,6 +894,31 @@ CREATE TABLE equivalentclassgroup
       REFERENCES primitiveclass (id) MATCH SIMPLE
       ON UPDATE NO ACTION ON DELETE NO ACTION
 );
+
+
+CREATE INDEX equivalentclassgroup_kbid_idx
+  ON equivalentclassgroup
+  USING btree
+  (kbid);
+
+-- Index: equivalentclassgroup_rid_ridm_idx
+
+-- DROP INDEX equivalentclassgroup_rid_ridm_idx;
+
+CREATE INDEX equivalentclassgroup_rid_ridm_idx
+  ON equivalentclassgroup
+  USING btree
+  (rid, ridm);
+
+-- Index: equivalentclassgroup_ridm_idx
+
+-- DROP INDEX equivalentclassgroup_ridm_idx;
+
+CREATE INDEX equivalentclassgroup_ridm_idx
+  ON equivalentclassgroup
+  USING btree
+  (ridm);
+
 
 -- instance of a class
 -- If DAG indexing mechanism is used to compute inference 
