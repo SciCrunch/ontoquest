@@ -7,6 +7,8 @@ import edu.sdsc.ontoquest.OntoquestException;
 import edu.sdsc.ontoquest.ResourceSetMetaData;
 import edu.sdsc.ontoquest.query.Variable;
 
+import java.sql.Timestamp;
+
 /**
  * @version $Id: InMemoryResourceSet.java,v 1.1 2010-10-28 06:30:40 xqian Exp $
  *
@@ -42,6 +44,18 @@ public class InMemoryResourceSet extends AbstractResourceSet {
     else
       return Double.valueOf(o.toString());
   }
+
+  /**
+   * @see edu.sdsc.ontoquest.ResourceSet#getTimestamp(int)
+   */
+  public Timestamp getTimestamp(int columnIdx) throws OntoquestException {
+    Object o = _data[_currentPosition][columnIdx-1];
+    if (o instanceof Timestamp)
+      return (Timestamp)o;
+    else
+      return Timestamp.valueOf(o.toString());
+  }
+
 
   /**
    * @see edu.sdsc.ontoquest.ResourceSet#getFloat(int)
