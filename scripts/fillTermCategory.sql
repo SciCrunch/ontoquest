@@ -211,12 +211,11 @@ $$ LANGUAGE plpgsql;
 -- usage
 --select fill_term_category(:kbid, '''Anatomical object'', ''brain'', ''Cell'', ''Device'', ''Cellular Component'', ''extracellular structure'', ''cell line'', ''tissue section'', ''molecular entity'', ''Site'', ''Institution'', ''Platform'', ''Population'', ''Disease'', ''Biological_region'', ''gene'', ''Molecule role'', ''Drug'', ''Data object'', ''Assay'', ''Organism'', ''Data role'', ''Chemical role'', ''Reagent role'', ''familial role'', ''cell role'' , ''Quality'', ''Biomaterial_region'', ''Artifact Object'', ''Phenotype'', ''age'', ''Process'', ''behavioral process'', ''biological_process'', ''Regional Part Of Cell'', ''Resource''', '''birnlex_6'', ''sao1813327414'', ''birnlex_11013'', ''Function'', ''CHEBI_23367'', ''birnlex_2'', ''birnlex_2087'', ''birnlex_11021'', ''nlx_res_20090101''');
 
+
 CREATE OR REPLACE FUNCTION fill_term_category_v2(thekbid integer, category_list_str text, cm_type_list_str text)
   RETURNS void AS
 $BODY$
 /*
-  This function takes the category_list_str, and searches in label and name field of graph_nodes table 
-  to find the classes of the category terms. 
   fills table term_category. Extract all terms (class label + synonyms) in the specified kbid and their
   class name (tid), then populate the term_category table. For each term, if it is a subclass of
   one of the supplied categories, fill the category column. Always use the lowest level of the category.
@@ -333,23 +332,56 @@ BEGIN
   -- If so, add the relationship in tmp_cat_tree. Then, find all known ancestors of the child nodes, and
   -- see which one is the closest ancestor. Update the table with the closest ancestor.
   EXECUTE 'drop table if exists tmp_cat_tree cascade';
+  delete from top_categories where kbid=thekbid;
 
   EXECUTE 'create table tmp_cat_tree (desc_rid integer, desc_rtid integer, anc_rid integer, anc_rtid integer, height integer, desc_label character varying)';
+  FOR i IN ARRAY_LOWER(categoryIDs, 1)..ARRAY_UPPER(categoryIDs, 1) LOOP
+    INSERT INTO top_categories (rid, rtid, label, uri, kbid)
+       select categoryIDs[i][1], categoryIDs[i][2], n.label, n.uri, theKbid
+       from graph_nodes n where kbid=theKbid and n.rid = categoryIDs[i][1] and n.rtid=categoryIDs[i][2];
+  END LOOP;
+
   FOR i IN ARRAY_LOWER(categoryIDs, 1)..ARRAY_UPPER(categoryIDs, 1) LOOP
     INSERT INTO tmp_cat_tree (desc_rid, desc_rtid, anc_rid, anc_rtid, height, desc_label)
     values (categoryIDs[i][1], categoryIDs[i][2], null, null, null, 
          (select n.label from graph_nodes n where kbid=theKbid and n.rid = categoryIDs[i][1] and n.rtid=categoryIDs[i][2]));
   END LOOP;
 
-  -- populate categories for all terms
-  FOR rec1 IN select desc_rid, desc_rtid from tmp_cat_tree order by height
-  LOOP
-    insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid) select distinct rid1, rtid1, rec1.desc_rid, rec1.desc_rtid 
-      from get_closure_by_rid(rec1.desc_rid, rec1.desc_rtid, 'subClassOf', thekbid, true, true) t, nif_term nt
-      where t.rid1 = nt.rid and t.rtid1 = nt.rtid;
---    raise notice 'add all descendants of category %, %', rec1.desc_rid, rec1.desc_rtid;
-  END LOOP;
+  -- first insert the category terms into the final table
+  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid, category )
+  select distinct t.desc_rid, t.desc_rtid, t.desc_rid, t.desc_rtid, t.desc_label 
+  from tmp_cat_tree t;
+
+  -- populate categories for all terms that are subclasses of top categories.
+  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid, category) 
+    with recursive incoming_closure ( rid1, rtid1, cat_rid, cat_rtid, category
+      ) as (
+       select e.rid1, e.rtid1, n.rid, n.rtid, n.desc_label 
+       from graph_edges e, 
+           ( (select nn.rid, nn.rtid, tt.desc_label from graph_nodes nn, tmp_cat_tree tt 
+               where nn.rid= tt.desc_rid and nn.rtid=1 and nn.kbid= thekbid) 
+            union
+             ( select g.rid, 1, tt2.desc_label from equivalentclassgroup g, tmp_cat_tree tt2
+                where tt2.desc_rid = g.ridm  and g.kbid= thekbid ))  n 
+       where n.rtid=1 and ( e.rid1 <> e.rid2 or e.rtid1 <> e.rtid2 ) 
+            and e.rid2 = n.rid and e.rtid2 = n.rtid and e.pid = subclassPid
+      union 
+        select ge.rid1, ge.rtid1, ie.cat_rid,ie.cat_rtid, ie.category 
+         from incoming_closure ie, graph_edges ge
+         where ie.rid1 = ge.rid2 and ie.rtid1 = ge.rtid2 and
+           ( ge.rid1 <> ge.rid2 or ge.rtid1 <> ge.rtid2 ) and ge.pid = subclassPid
+      )
+      select r.rid1, r.rtid1, r.cat_rid, r.cat_rtid, r.category from incoming_closure r;
+
   raise notice 'Inserted all categories for all terms';
+
+  -- categorize all the equivalent class
+  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid, category) 
+    select g.ridm, 1 , t1.cat_rid, t1.cat_rtid, t1.category
+    from term_category_tbl t1, equivalentclassgroup g
+    where t1.rid = g.rid and t1.rtid = 1 and g.kbid=thekbid
+       and not exists ( select 1 from term_category_tbl tt where tt.rid = g.ridm);
+
   
   -- For every (rid, rtid, cat_rid, cat_rtid) pair, get category (cat_rid, cat_rtid)'s superclasses (sc_rid, sc_rtid), 
   -- remove all pairs (rid, rtid, sc_rid, sc_rtid) in term_category_tbl.
@@ -361,12 +393,6 @@ BEGIN
 --    raise notice 'delete redundant descendants of category %, %', rec2.desc_rid, rec2.desc_rtid;
   END LOOP;
   raise notice 'Deleted all redundant descendants of categories.';
-
-  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid)
-  select distinct t.rid, t.rtid, t.rid, t.rtid from nif_term t where 
-  t.rtid = 1 and 
-  exists ( select 1 from tmp_cat_tree nc where  lower(t.term) = nc.desc_label)
-  and not exists ( select 1 from term_category_tbl tc where tc.rid = t.rid and tc.rtid = 1);
 
   -- fill the label for categories
   update term_category_tbl tc set category = (select n.name from graph_nodes n, graph_edges e, property p 

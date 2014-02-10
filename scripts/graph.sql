@@ -830,6 +830,8 @@ $BODY$
   COST 100;
 
 
+-- DROP FUNCTION update_equivalent_class_group(integer);
+
 CREATE OR REPLACE FUNCTION update_equivalent_class_group(thekbid integer)
   RETURNS void AS
 $BODY$
@@ -851,24 +853,73 @@ BEGIN
          RAISE NOTICE  '%, %  already exists in group table, ignoring it.', mvrec.classid1,mvrec.classid2;
       elsif exists ( select 1 from equivalentclassgroup c where c.rid = mvrec.classid1)
       then
-         RAISE NOTICE '% is representitive in group, adding % to the group.', mvrec.classid1 ,  mvrec.classid2;
-
-         -- check if representitive is an obsolete node
-         if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = mvrec.classid1 and n1.rtid = class_rtid)
-            and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid2 and n2.rtid = class_rtid)
+         select rid into rep_id from  equivalentclassgroup c where c.ridm=mvrec.classid2;
+         if rep_id is not null  -- classid2 is a member of another group
          then 
+           RAISE NOTICE '% is representitive in group, and % is also a member of another group, merge the 2 groups', mvrec.classid1 ,  mvrec.classid2;  
+
+           -- check if one representitive is an obsolete node.
+           if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = rep_id and n1.rtid = class_rtid)
+            and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid1 and n2.rtid = class_rtid)
+           then
+              -- merge with classid1 group
+              update equivalentclassgroup
+               set rid = mvrec.classid1
+               where rid = rep_id;
+              insert into equivalentclassgroup (rid, ridm, kbid) values
+              (mvrec.classid1, rep_id, thekbid);
+           else
+              -- merge with rep_id group
+              update equivalentclassgroup
+                 set rid = rep_id
+              where rid = mvrec.classid1;
+              insert into equivalentclassgroup (rid, ridm, kbid) values
+              (rep_id, mvrec.classid1, thekbid);
+           end if;
+         else
+           RAISE NOTICE '% is representitive in group, adding % to the group.', mvrec.classid1 ,  mvrec.classid2;
+
+           -- check if representitive is an obsolete node
+           if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = mvrec.classid1 and n1.rtid = class_rtid)
+            and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid2 and n2.rtid = class_rtid)
+           then 
             update equivalentclassgroup
                set rid = mvrec.classid2
             where rid = mvrec.classid1;
 
             insert into equivalentclassgroup (rid, ridm, kbid) values
               (mvrec.classid2, mvrec.classid1, thekbid);
-         else 
+           else 
             insert into equivalentclassgroup (rid, ridm, kbid) values
               (mvrec.classid1, mvrec.classid2, thekbid);
+           end if;
          end if;
       elsif exists ( select 1 from equivalentclassgroup c where c.rid = mvrec.classid2)
       then
+        select rid into rep_id from  equivalentclassgroup c where c.ridm=mvrec.classid1;
+        if rep_rid is not null  -- classid1 is a member of another group
+        then
+          RAISE NOTICE '% is a member of another group, and classid2 % is representitive in group,  merge the 2 groups', mvrec.classid1 ,  mvrec.classid2;  
+
+           -- check if one representitive is an obsolete node.
+           if (select n1.is_obsolete from graph_nodes_all n1 where n1.rid = rep_id and n1.rtid = class_rtid)
+            and not (select n2.is_obsolete from graph_nodes_all n2 where n2.rid = mvrec.classid2 and n2.rtid = class_rtid)
+           then
+              -- merge with classid2 group
+              update equivalentclassgroup
+               set rid = mvrec.classid2
+               where rid = rep_id;
+              insert into equivalentclassgroup (rid, ridm, kbid) values
+              (mvrec.classid2, rep_id, thekbid);
+           else
+              -- merge with rep_id group
+              update equivalentclassgroup
+                 set rid = rep_id
+              where rid = mvrec.classid2;
+              insert into equivalentclassgroup (rid, ridm, kbid) values
+              (rep_id, mvrec.classid2, thekbid);
+           end if;
+        else
          RAISE NOTICE '% is not a member, but % is a representitive , add it to group.', mvrec.classid1, mvrec.classid2 ;
 
          -- check if representitive is an obsolete node
@@ -883,6 +934,7 @@ BEGIN
          else 
             insert into equivalentclassgroup (rid, ridm, kbid) values (mvrec.classid2, mvrec.classid1, thekbid);
          end if;
+        end if;
       elsif exists ( select 1 from equivalentclassgroup c where c.ridm = mvrec.classid2)
       then
          select rid into rep_id from equivalentclassgroup c where c.ridm = mvrec.classid2;
@@ -947,8 +999,6 @@ END;
 $BODY$
   LANGUAGE plpgsql VOLATILE
   COST 100;
-
-
 
   
 /*
