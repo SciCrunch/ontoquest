@@ -184,11 +184,12 @@ public class ClassNodeResource extends BaseResource {
 			Element classesElem = d.createElement("classes");
 			dataElem.appendChild(classesElem);
 
-			for (ClassNode classNode : classNodes.values()) { // matched
-				Element classNodeElem = classNode.toXml(d);
-				classesElem.appendChild(classNodeElem);
-			} 
-
+      if ( classNodes != null) {
+			  for (ClassNode classNode : classNodes.values()) { // matched
+				  Element classNodeElem = classNode.toXml(d);
+				  classesElem.appendChild(classNodeElem);
+			  } 
+      }
 			d.normalizeDocument();
 
 			// Returns the XML representation of this document.
