@@ -12,6 +12,9 @@ CREATE TABLE nif_term (
   inferred boolean,
   is_acronym boolean,
   is_abbrev boolean,
+  synonyms character varying(3000),
+  acronyms character varying(3000),
+  abbreviations character varying(3000),
   primary key (rid, rtid, term)
 );
 
@@ -29,11 +32,14 @@ CREATE TABLE term_category_tbl (
   ,primary key (rid, rtid, cat_rid, cat_rtid)
 );
 
-CREATE OR REPLACE VIEW term_category AS
-  select t.term, t.tid, t.rid, t.rtid, t.inferred, t.is_acronym, t.is_abbrev, tc.category, tc.cat_rid, tc.cat_rtid
-  , tc.cm_type, tc.cm_type_rid, tc.cm_type_rtid
-  from nif_term t left outer join term_category_tbl tc
-  on (t.rid = tc.rid and t.rtid = tc.rtid);
+
+CREATE OR REPLACE VIEW term_category AS 
+ SELECT t.term, t.tid, t.rid, t.rtid, t.inferred, t.is_acronym, t.is_abbrev, 
+  tc.category, tc.cat_rid, tc.cat_rtid, tc.cm_type, tc.cm_type_rid, tc.cm_type_rtid,
+  t.synonyms,t.acronyms, t.abbreviations
+   FROM nif_term t
+   LEFT JOIN term_category_tbl tc ON t.rid = tc.rid AND t.rtid = tc.rtid
+  WHERE t.term !~~ '%http://%'::text;
 
 /*
   deprecated. Please use the fill_term_category_v2 function instead.
@@ -226,7 +232,7 @@ DECLARE
   rec2 RECORD;
   sql TEXT;
   counter INTEGER := 0;
-  synonymProperties TEXT := '''prefLabel'', ''label'', ''synonym'', ''abbrev'',  ''hasExactSynonym'', ''hasRelatedSynonym'', ''acronym'', ''taxonomicCommonName'', ''ncbiTaxScientificName'', ''ncbiTaxGenbankCommonName'', ''ncbiTaxBlastName'', ''ncbiIncludesName'', ''ncbiInPartName'', ''hasNarrowSynonym'', ''misspelling'', ''misnomer'', ''hasBroadSynonym''';
+--  synonymProperties TEXT := '''prefLabel'', ''label'', ''synonym'', ''abbrev'',  ''hasExactSynonym'', ''hasRelatedSynonym'', ''acronym'', ''taxonomicCommonName'', ''ncbiTaxScientificName'', ''ncbiTaxGenbankCommonName'', ''ncbiTaxBlastName'', ''ncbiIncludesName'', ''ncbiInPartName'', ''hasNarrowSynonym'', ''misspelling'', ''misnomer'', ''hasBroadSynonym''';
   synPropIDs integer[];
   categoryIDs integer[][];
   kbid_condition text := '';
@@ -278,7 +284,7 @@ BEGIN
       kbid_condition := ' and p.kbid = '||theKbid;
     END IF;
     
-    IF synonymProperties is not null AND synonymProperties != '*' AND synonymProperties != '' THEN  
+  /*  IF synonymProperties is not null AND synonymProperties != '*' AND synonymProperties != '' THEN  
       sql := 'select p.id from property p where p.name in ('||synonymProperties||')'||kbid_condition;
       FOR rec0 IN EXECUTE sql
       LOOP
@@ -289,11 +295,21 @@ BEGIN
           synPropIDs := synPropIDs || rec0.id;
         END IF;
       END LOOP;
-    END IF;
+    END IF; */
 
 --raise notice 'synPropIDs = %', synPropIDs;
 
   -- fill out tid and term
+ insert into nif_term (term, tid, rid, rtid)
+select distinct n2.name, n.name, n.rid, n.rtid from graph_nodes n, relationship e, property p, graph_nodes n2
+where n.rid = e.subjectid and n.rtid = 1 and e.subject_rtid = 1 and n.kbid = theKbid
+  and p.id = e.propertyid and 
+    p.name in ('prefLabel', 'label', 'has_exact_synonym','synonym', 'abbrev',  'hasExactSynonym', 'hasRelatedSynonym', 
+     'acronym', 'taxonomicCommonName', 'ncbiTaxScientificName', 'ncbiTaxGenbankCommonName', 'ncbiTaxBlastName',
+     'ncbiIncludesName', 'ncbiInPartName', 'hasNarrowSynonym', 'misspelling', 'misnomer', 'hasBroadSynonym')
+    and n2.rid = e.objectid and n2.rtid = e.object_rtid ;
+    
+/*     
   FOR rec1 IN select rid, rtid, name from graph_nodes where kbid = theKbid and rtid = 1 and name != 'Thing' --limit 50
   LOOP
     FOR rec2 IN select distinct name2 from get_neighborhood(ARRAY[[rec1.rid, rec1.rtid]], synPropIDs, null, false,1,true,false, false,false) where name2 is not null
@@ -303,6 +319,7 @@ BEGIN
     END LOOP;
 
   END LOOP;
+*/
 
   -- fill inferred flag
   raise notice 'Filling inferred flag';
@@ -331,38 +348,35 @@ BEGIN
   -- first, iterate category pairs. For every pair, check if there exist ancestor-descendant relationship.
   -- If so, add the relationship in tmp_cat_tree. Then, find all known ancestors of the child nodes, and
   -- see which one is the closest ancestor. Update the table with the closest ancestor.
-  EXECUTE 'drop table if exists tmp_cat_tree cascade';
+--  EXECUTE 'drop table if exists tmp_cat_tree cascade';
   delete from top_categories where kbid=thekbid;
 
-  EXECUTE 'create table tmp_cat_tree (desc_rid integer, desc_rtid integer, anc_rid integer, anc_rtid integer, height integer, desc_label character varying)';
+--  EXECUTE 'create table tmp_cat_tree (desc_rid integer, desc_rtid integer, anc_rid integer, anc_rtid integer, height integer, desc_label character varying)';
   FOR i IN ARRAY_LOWER(categoryIDs, 1)..ARRAY_UPPER(categoryIDs, 1) LOOP
     INSERT INTO top_categories (rid, rtid, label, uri, kbid)
        select categoryIDs[i][1], categoryIDs[i][2], n.label, n.uri, theKbid
        from graph_nodes n where kbid=theKbid and n.rid = categoryIDs[i][1] and n.rtid=categoryIDs[i][2];
   END LOOP;
 
+/*
   FOR i IN ARRAY_LOWER(categoryIDs, 1)..ARRAY_UPPER(categoryIDs, 1) LOOP
     INSERT INTO tmp_cat_tree (desc_rid, desc_rtid, anc_rid, anc_rtid, height, desc_label)
     values (categoryIDs[i][1], categoryIDs[i][2], null, null, null, 
          (select n.label from graph_nodes n where kbid=theKbid and n.rid = categoryIDs[i][1] and n.rtid=categoryIDs[i][2]));
   END LOOP;
-
-  -- first insert the category terms into the final table
-  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid, category )
-  select distinct t.desc_rid, t.desc_rtid, t.desc_rid, t.desc_rtid, t.desc_label 
-  from tmp_cat_tree t;
+*/
 
   -- populate categories for all terms that are subclasses of top categories.
   insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid, category) 
     with recursive incoming_closure ( rid1, rtid1, cat_rid, cat_rtid, category
       ) as (
-       select e.rid1, e.rtid1, n.rid, n.rtid, n.desc_label 
+       select e.rid1, e.rtid1, n.rid, n.rtid, n.label 
        from graph_edges e, 
-           ( (select nn.rid, nn.rtid, tt.desc_label from graph_nodes nn, tmp_cat_tree tt 
-               where nn.rid= tt.desc_rid and nn.rtid=1 and nn.kbid= thekbid) 
+           ( (select nn.rid, nn.rtid, tt.label from graph_nodes nn, top_categories tt 
+               where nn.rid= tt.rid and nn.rtid=1 and nn.kbid= thekbid and tt.kbid = thekbid) 
             union
-             ( select g.rid, 1, tt2.desc_label from equivalentclassgroup g, tmp_cat_tree tt2
-                where tt2.desc_rid = g.ridm  and g.kbid= thekbid ))  n 
+             ( select g.rid, 1, tt2.label from equivalentclassgroup g, top_categories tt2
+                where tt2.rid = g.ridm  and g.kbid= thekbid and tt2.kbid = thekbid))  n 
        where n.rtid=1 and ( e.rid1 <> e.rid2 or e.rtid1 <> e.rtid2 ) 
             and e.rid2 = n.rid and e.rtid2 = n.rtid and e.pid = subclassPid
       union 
@@ -371,7 +385,7 @@ BEGIN
          where ie.rid1 = ge.rid2 and ie.rtid1 = ge.rtid2 and
            ( ge.rid1 <> ge.rid2 or ge.rtid1 <> ge.rtid2 ) and ge.pid = subclassPid
       )
-      select r.rid1, r.rtid1, r.cat_rid, r.cat_rtid, r.category from incoming_closure r;
+      select distinct r.rid1, r.rtid1, r.cat_rid, r.cat_rtid, r.category from incoming_closure r;
 
   raise notice 'Inserted all categories for all terms';
 
@@ -382,14 +396,25 @@ BEGIN
     where t1.rid = g.rid and t1.rtid = 1 and g.kbid=thekbid
        and not exists ( select 1 from term_category_tbl tt where tt.rid = g.ridm);
 
+
+  -- insert the category terms into the final table if they are not in it yet.
+  insert into term_category_tbl (rid, rtid, cat_rid, cat_rtid, category )
+  select distinct t.rid, t.rtid, t.rid, t.rtid, t.label 
+  from top_categories t
+    where t.kbid = thekbid and 
+      not exists ( select 1 from term_category_tbl tcb 
+                       where tcb.rid = t.rid and 
+                             tcb.rtid = t.rtid and 
+                             tcb.cat_rid = t.rid and 
+                             tcb.cat_rtid = t.rtid);
   
   -- For every (rid, rtid, cat_rid, cat_rtid) pair, get category (cat_rid, cat_rtid)'s superclasses (sc_rid, sc_rtid), 
   -- remove all pairs (rid, rtid, sc_rid, sc_rtid) in term_category_tbl.
-  FOR rec2 IN select desc_rid, desc_rtid from tmp_cat_tree
+  FOR rec2 IN select rid, rtid from top_categories where kbid=thekbid
   LOOP
    delete from term_category_tbl tc1 where (rid, rtid, cat_rid, cat_rtid) in (select tc2.rid, tc2.rtid, ne.rid2, ne.rtid2 
-      from term_category_tbl tc2, get_neighborhood(rec2.desc_rid, rec2.desc_rtid, subclassPid, false, 0, true, 
-      true, true, false) ne where tc2.cat_rid = rec2.desc_rid and tc2.cat_rtid = rec2.desc_rtid);
+      from term_category_tbl tc2, get_neighborhood(rec2.rid, rec2.rtid, subclassPid, false, 0, true, 
+      true, true, false) ne where tc2.cat_rid = rec2.rid and tc2.cat_rtid = rec2.rtid);
 --    raise notice 'delete redundant descendants of category %, %', rec2.desc_rid, rec2.desc_rtid;
   END LOOP;
   raise notice 'Deleted all redundant descendants of categories.';
