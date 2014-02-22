@@ -100,6 +100,64 @@ CREATE INDEX graph_edges_all_r1idx  ON graph_edges_all USING btree (rid1);
 CREATE INDEX graph_edges_rid2idx  ON graph_edges_all USING btree (rid2);
 
 
+-- DROP TABLE graph_edges_raw;
+-- This table stores the original graph before any inference.
+CREATE TABLE graph_edges_raw
+(
+  rid1 integer,
+  rtid1 integer,
+  pid integer,
+  rid2 integer,
+  rtid2 integer,
+  kbid integer,
+  derived boolean,
+  hidden boolean,
+  restriction_type character(1),
+  restriction_stmt character varying(255),
+  is_obsolete boolean
+)
+WITH (
+  OIDS=FALSE
+);
+
+-- Index: graph_edges_raw_kbid_idx
+
+-- DROP INDEX graph_edges_raw_kbid_idx;
+
+CREATE INDEX graph_edges_raw_kbid_idx
+  ON graph_edges_raw
+  USING btree
+  (kbid);
+
+-- Index: graph_edges_raw_pid_kbid_idx
+
+-- DROP INDEX graph_edges_raw_pid_kbid_idx;
+
+CREATE INDEX graph_edges_raw_pid_kbid_idx
+  ON graph_edges_raw
+  USING btree
+  (pid, kbid);
+
+-- Index: graph_edges_raw_rid1_rid2_kbid_idx
+
+-- DROP INDEX graph_edges_raw_rid1_rid2_kbid_idx;
+
+CREATE INDEX graph_edges_raw_rid1_rid2_kbid_idx
+  ON graph_edges_raw
+  USING btree
+  (rid1, rid2, kbid);
+
+-- Index: graph_edges_raw_rid2_kbid_idx
+
+-- DROP INDEX graph_edges_raw_rid2_kbid_idx;
+
+CREATE INDEX graph_edges_raw_rid2_kbid_idx
+  ON graph_edges_raw
+  USING btree
+  (rid2, kbid);
+
+
+
 -------------------------------------
 
 CREATE OR REPLACE FUNCTION compute_label_from_graph(theRid INTEGER, theRtid INTEGER) RETURNS TEXT AS $$
@@ -1105,7 +1163,8 @@ $BODY$
     -- clean up existing nodes and edges
     DELETE FROM graph_edges_all where kbid = theKbid;
     DELETE FROM graph_nodes_all where kbid = theKbid;
-    raise notice 'Clean up graph_edges_all and graph_nodes_all table.';
+    delete from graph_edges_raw where kbid = theKbid;
+    raise notice 'Clean up graph_edges_all, graph_edges_raw and graph_nodes_all table.';
 
     SELECT p.id, rt.id INTO owlRestrictionRid, owlRestrictionRtid FROM primitiveclass p, resourcetype rt where p.name = 'Restriction' and rt.rtype = 'c' and is_system = true and kbid = theKbid;
 
@@ -1274,7 +1333,8 @@ $BODY$
 
     -- insert subclassOf edges, remove those representing equivalent classes 
     -- I removed all the data integrity checking in the statements bellow, because we are using foreign keys in the graph_edges table to ensure that.
-    INSERT INTO graph_edges_all select distinct childid, child_rtid, p.id as pid, parentid, parent_rtid, t.kbid, false, 
+    INSERT INTO graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden, restriction_type, restriction_stmt)
+    select distinct childid, child_rtid, p.id as pid, parentid, parent_rtid, t.kbid, false, 
     false as hidden, -- hidden to be false
  --     case when parent_rtid in (2,3,4,5,6,10,16) or child_rtid in (2,3,4,5,6,10,16) then true else false end as hidden,
       null as restriction_type, null as restriction_stmt
@@ -1285,7 +1345,8 @@ $BODY$
     raise notice 'added subclassOf relationships as edges.';
 
     -- insert equivalentClass edges
-    INSERT INTO graph_edges_all select distinct t.classid1, t.class_rtid1, p.id, t.classid2, t.class_rtid2, t.kbid, 
+    INSERT INTO graph_edges_all (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden, restriction_type, restriction_stmt)
+    select distinct t.classid1, t.class_rtid1, p.id, t.classid2, t.class_rtid2, t.kbid, 
       false, false, null as restriction_type, null as restriction_stmt
       from equivalentclass t, property p where p.name = 'equivalentClass' and p.is_system = true and p.kbid = t.kbid
       and t.kbid = theKbid;
@@ -1664,11 +1725,17 @@ $BODY$
     perform set_obsolete_flag(theKbid);
     raise notice 'obsolete flag is updated.';
 
+    raise notice 'populating graph_edges_raw table';
+    insert into graph_edges_raw (rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden, restriction_type, restriction_stmt, is_obsolete)
+    select rid1, rtid1, pid, rid2, rtid2, kbid, derived, hidden, restriction_type, restriction_stmt, is_obsolete from graph_edges_all where kbid = theKbid;
+
     RETURN true;
 
   END;
 $BODY$
-  LANGUAGE plpgsql;
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
 
 
 CREATE OR REPLACE FUNCTION update_graph(theKbid integer) 
