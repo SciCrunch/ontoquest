@@ -181,16 +181,29 @@ CREATE INDEX ns_idx2 ON namespace (url);
 
 CREATE INDEX ns_idx3 ON namespace (kbid);
 
-CREATE TABLE ontologyuri (
-  id serial PRIMARY KEY,
+
+CREATE TABLE ontologyuri
+(
+  id serial NOT NULL,
   uri text NOT NULL,
   is_default boolean,
-  nsid integer REFERENCES namespace (id) ON DELETE CASCADE,
-  kbid integer NOT NULL REFERENCES kb (id) ON DELETE CASCADE 
-  , browsertext text
-  , document_uri text -- the location of ontology, may not be same as uri
-  ,owl_content text    -- actual content of the owl file
-  ,owl_file_length bigint  -- length of the owl file.
+  nsid integer,
+  kbid integer NOT NULL,
+  browsertext text,
+  document_uri text,
+  owl_content text,
+  owl_file_length bigint,
+  version_iri character varying(500),
+  CONSTRAINT ontologyuri_pkey PRIMARY KEY (id),
+  CONSTRAINT ontologyuri_kbid_fkey FOREIGN KEY (kbid)
+      REFERENCES kb (id) MATCH SIMPLE
+      ON UPDATE NO ACTION ON DELETE CASCADE,
+  CONSTRAINT ontologyuri_nsid_fkey FOREIGN KEY (nsid)
+      REFERENCES namespace (id) MATCH SIMPLE
+      ON UPDATE NO ACTION ON DELETE CASCADE
+)
+WITH (
+  OIDS=FALSE
 );
 
 CREATE INDEX ontologyuri_idx1 ON ontologyuri (kbid);
@@ -1032,3 +1045,68 @@ CREATE TABLE kb_history
   creation_date timestamp without time zone,
   removal_date timestamp without time zone
 );
+
+/* this table stores the top category terms used for populating 
+   term_category_tbl */
+-- DROP TABLE top_categories;
+CREATE TABLE top_categories
+(
+  rid integer,
+  rtid integer,
+  label text,
+  uri character varying(512),
+  kbid integer
+)
+WITH (
+  OIDS=FALSE
+);
+
+-- Index: top_categories_kbid_idx
+
+-- DROP INDEX top_categories_kbid_idx;
+
+CREATE INDEX top_categories_kbid_idx
+  ON top_categories
+  USING btree
+  (kbid);
+
+-- Index: top_categories_rid_idx
+
+-- DROP INDEX top_categories_rid_idx;
+
+CREATE INDEX top_categories_rid_idx
+  ON top_categories
+  USING btree
+  (rid);
+  
+CREATE TABLE synonym_property_names
+(
+  property_name character varying(100),
+  CONSTRAINT synonym_property_names_pkey PRIMARY KEY (property_name)
+)
+WITH (
+  OIDS=FALSE
+);
+COMMENT ON TABLE synonym_property_names
+  IS 'When Ontoquest search synonyms, it uses a defined property name list to search relations on these properties. This table stores all the synonym property names so that they are maintained in one place. ';
+  
+insert into synonym_property_names
+values 
+ ('prefLabel'),
+ ('label'),
+  ('has_exact_synonym'),
+  ('synonym'), 
+  ('abbrev'), 
+  ( 'hasExactSynonym'), 
+  ('hasRelatedSynonym'), 
+  ('acronym'),
+  ( 'taxonomicCommonName'), 
+  ('ncbiTaxScientificName'), 
+  ('ncbiTaxGenbankCommonName'), 
+  ('ncbiTaxBlastName'),
+  ('ncbiIncludesName'), 
+  ('ncbiInPartName'), 
+  ('hasNarrowSynonym'), 
+  ('misspelling'), 
+  ('misnomer'),
+  ( 'hasBroadSynonym');
