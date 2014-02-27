@@ -441,7 +441,7 @@ public class DbBasicFunctions implements BasicFunctions {
     String queryStr = DbUtility.formatArrayToStr(nodeNames);
     // get connection pool
     Utility.checkClass(context, DbContext.class, OntoquestException.Type.EXECUTOR);
-    DbConnectionPool conPool = ((DbContext)context).getConPool();
+//    DbConnectionPool conPool = ((DbContext)context).getConPool();
     // prepare arguments for SQL
     String[] args = new String[4];
     args[0] = queryStr;
