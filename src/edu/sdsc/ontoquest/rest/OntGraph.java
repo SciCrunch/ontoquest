@@ -18,6 +18,7 @@ import edu.sdsc.ontoquest.db.DbResourceSet;
 import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.db.functions.GetNeighbors;
 import edu.sdsc.ontoquest.query.Utility;
+import edu.sdsc.ontoquest.query.Variable;
 import edu.sdsc.ontoquest.rest.BaseBean.InputType;
 import edu.sdsc.ontoquest.rest.BaseBean.NeighborType;
 
@@ -25,7 +26,10 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
+import java.util.TreeSet;
 
 /**
  * @version $Id: OntGraph.java,v 1.7 2013-10-22 19:35:03 jic002 Exp $
@@ -93,7 +97,7 @@ public class OntGraph extends BaseBean {
 	}
 
 	public static OntGraph get(String inputStr, NeighborType type, int kbId,
-			Map<String, Object> attributes, InputType inputType, Context context, int lmt ) throws OntoquestException {
+			Map<String, Object> attributes, InputType inputType, Context context, int lmt, boolean includeDerived ) throws OntoquestException {
 
 		int hops = extractLevel(attributes);
 		int edgeType = GetNeighbors.EDGE_BOTH;
@@ -129,6 +133,12 @@ public class OntGraph extends BaseBean {
 					excludedProperties, edgeType, true, true, hops, true);
 			nodeMap.put(ClassNode.generateId(ontoId[0], ontoId[1]), ontoId); // add original
 		} else if (inputType == InputType.NAME) {
+      
+      // if just search for 1 level, use the short cut.
+      if ( hops == 1 ) {
+        String sql = getSQLStatement(inputStr, kbId, edgeType, includeDerived);
+        return new OntGraph(sql, context, lmt);
+      }
 			ResourceSet rs = getBasicFunctions().searchAllIDsByName(inputStr, new int[]{kbId}, true, context, getVarList3());
 			LinkedList<int[]> idList = new LinkedList<int[]>();
 			while (rs.next()) {
@@ -261,7 +271,7 @@ public class OntGraph extends BaseBean {
 		// Set<ClassNode> nodes = ClassNode.get(idArray, context);
     if ( f instanceof GetNeighbors)  
     {
-      if (((GetNeighbors)f).getResultLimit() < counter) 
+      if (((GetNeighbors)f).getResultLimit() >0 && ((GetNeighbors)f).getResultLimit() < counter) 
       {
         return new OntGraph(edgeSet, true);
       }
@@ -280,6 +290,105 @@ public class OntGraph extends BaseBean {
 		this.edges = edges;
     this.isTruncated = isTruncated;
 	}
+
+  /*
+   * The sql statement has to return 11 columens that matches the constuctor 
+   * of Relationship
+   */
+  private OntGraph(String sql, Context context, int lmt) throws OntoquestException
+  {
+    this.edges = new TreeSet<Relationship>();
+    
+
+    List<Variable> varList = new ArrayList<Variable>(11);
+    for ( int i = 0 ; i < 11 ; i++ ) 
+       varList.add(new Variable(1));
+    
+    int counter = 0;
+    ResourceSet rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting graph info from sql " + sql, lmt);
+    while (rs.next()) {
+      Relationship e = new Relationship(
+        rs.getInt(1), rs.getInt(2),rs.getString(3), rs.getInt(4), rs.getInt(5),
+        rs.getString(6), rs.getInt(7), rs.getString(8),rs.getString(9),
+        rs.getString(10),rs.getString(11));
+      if (!edges.contains(e))
+         edges.add(e);
+      counter ++;
+    }
+    rs.close();
+
+    if ( lmt > 0 && lmt < counter)
+      this.isTruncated = true;
+    else 
+      this.isTruncated = false;
+
+  }
+  
+ static private String getSQLStatement(String inputStr, int kbId, int edgeType, boolean includeDerivedEdges) 
+  {
+
+    String edgeTableName = "graph_edges_raw";
+    if (includeDerivedEdges ) 
+    {
+      edgeTableName = "graph_edges";
+    }
+    
+
+    String lterm = inputStr.toLowerCase();
+    if (edgeType == GetNeighbors.EDGE_OUTGOING) {
+      return "select n0.rid, n0.rtid, gn.label, e.rid2, e.rtid2, n2.label, e.pid , gp.label, gn.name, n2.name, gp.name " +
+         "from " + edgeTableName + " e, " + 
+         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
+         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
+         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
+         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
+         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
+         "where n0.rid = e.rid1 and e.rtid1 = 1 and n2.rid = e.rid2 and " +
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
+    } else if ( edgeType == GetNeighbors.EDGE_INCOMING) 
+    {
+      return "select n2.rid, n2.rtid, n2.label, e.rid2, e.rtid2, gn.label, e.pid , gp.label, n2.name, gn.name, gp.name " +
+         "from " + edgeTableName + " e, " + 
+         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
+         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
+         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
+         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
+         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
+         "where n0.rid = e.rid2 and e.rtid1 = 1 and n2.rid = e.rid1 and " +
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
+  
+    } else if ( edgeType == GetNeighbors.EDGE_BOTH ) {
+      return 
+          "(" +
+          "select n0.rid, n0.rtid, gn.label, e.rid2, e.rtid2, n2.label, e.pid , gp.label, gn.name, n2.name, gp.name " +
+         "from " + edgeTableName + " e, " + 
+         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
+         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
+         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
+         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
+         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
+         "where n0.rid = e.rid1 and e.rtid1 = 1 and n2.rid = e.rid2 and " +
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid " +
+         " ) union ("  +  
+         "select n2.rid, n2.rtid, n2.label, e.rid2, e.rtid2, gn.label, e.pid , gp.label, n2.name, gn.name, gp.name " +
+         "from " + edgeTableName + " e, " + 
+         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
+         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
+         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
+         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
+         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
+         "where n0.rid = e.rid2 and e.rtid1 = 1 and n2.rid = e.rid1 and " +
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid" +
+         ")"  ;
+    }
+    
+    return null;
+  }
 
 	//  /**
 	//   * @return the nodes
