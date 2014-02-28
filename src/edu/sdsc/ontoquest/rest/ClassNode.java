@@ -27,6 +27,8 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 
 import java.util.ArrayList;
+import java.util.TreeMap;
+
 
 /**
  * @version $Id: ClassNode.java,v 1.6 2013-10-29 23:52:45 jic002 Exp $
@@ -35,15 +37,27 @@ import java.util.ArrayList;
 public class ClassNode extends BasicClassNode {
 
   protected static String interanIdAttrName = "InternalId";
+  
+  private static TreeMap<Integer,String> classIDCache = new TreeMap <Integer,String>() ;
 
 	public static String generateId(int rid, int rtid) {
 		return rid+"-"+rtid;
 	}
   
-  public static String generateExtId ( int rid, int rtid, Context context ) 
+  public static synchronized String generateExtId ( int rid, int rtid, Context context ) 
      throws OntoquestException
   {
+    if (rtid == 1 ) {
+      if ( classIDCache == null) 
+        classIDCache = new TreeMap <Integer,String>() ;
     
+      // try to find the id from cache
+      String res = classIDCache.get(rid);
+      if (res != null )
+         return res;
+    }
+    
+    // otherwise query the database     
     Connection conn = null;
     String id = null;
     ResultSet rs=null;
@@ -62,9 +76,11 @@ public class ClassNode extends BasicClassNode {
       rs.close();
       stmt.close();
       DbUtility.releaseDbConnection(conn, context);
-      if (id != null)
+      if (id != null) {
+        if (classIDCache.size() < 50000 && rtid == 1)  
+          classIDCache.put(rid, id);
         return id;
-      else
+      } else
         throw new OntoquestException(OntoquestException.Type.BACKEND, 
                  "Can't find id for rid="+rid+" and rtid="+rtid+ "in db."); 
     } catch (Exception e) {
