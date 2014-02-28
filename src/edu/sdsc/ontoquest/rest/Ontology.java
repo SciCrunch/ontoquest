@@ -16,6 +16,8 @@ import edu.sdsc.ontoquest.db.functions.GetNeighbors;
 import edu.sdsc.ontoquest.db.functions.RunSQL;
 import edu.sdsc.ontoquest.query.Variable;
 
+import java.net.URI;
+
 import java.sql.Timestamp;
 import org.semanticweb.owlapi.model.IRI;
 
@@ -43,6 +45,14 @@ public class Ontology extends BaseBean {
   Timestamp loadingTime ;
   IRI versionIRI;
   private int kbid;
+  IRI uri;
+  
+
+  private Ontology ( IRI uri, IRI versionIRI) 
+  {
+    this.versionIRI = versionIRI;
+    this.uri = uri;
+  }
   
   public Ontology(int rid, int rtid, String name, Context context) throws OntoquestException
   {
@@ -50,7 +60,7 @@ public class Ontology extends BaseBean {
     this.rtid = rtid;
     this.name = name;
     this.context = context;
-    this.importedOntologies = null;
+    this.importedOntologies = new ArrayList<Ontology> (50);
 
     // get the loading time and kbid first
     String sql = "select n.id, n.creation_date from kb n where n.name='"+name+"'";
@@ -91,7 +101,18 @@ public class Ontology extends BaseBean {
     }
     rs.close();
 
-  
+    sql = "select n.uri, n.version_iri from ontologyuri n where (not is_default) and n.kbid="+kbid+"";
+    varList = new ArrayList<Variable>(2);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+
+    rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting kb info for " + name,-1);
+    while (rs.next()) {
+      this.importedOntologies.add(new Ontology(IRI.create(rs.getString(1)),
+                                          IRI.create(rs.getString(2))));
+    }
+    rs.close();
   }
   
   public static Ontology get(String kbName, Context context) throws OntoquestException {
@@ -262,7 +283,14 @@ public class Ontology extends BaseBean {
     Element dateElem = doc.createElement("date_created");
     e.appendChild(dateElem);
     dateElem.appendChild(doc.createTextNode(dateCreated));
-*/    
+*/ 
+    Element importsElem = doc.createElement("imports");
+    e.appendChild(importsElem);
+    for (Ontology imps : this.importedOntologies) {
+      Element contributorElem = doc.createElement("contributor");
+  //    contributorsElem.appendChild(contributorElem);
+  //    contributorElem.appendChild(doc.createTextNode(contributor));
+    }
     return e;
   }
 
