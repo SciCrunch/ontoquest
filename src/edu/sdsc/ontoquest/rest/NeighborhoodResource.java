@@ -79,6 +79,17 @@ public class NeighborhoodResource extends BaseResource {
           throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Value of parameter 'limit' can only be integers.");
         }
       }
+
+      boolean includeDerived = false;
+      String derivedFlag = form.getFirstValue ("includeDerived");
+      if ( derivedFlag != null ) 
+      {
+        if ( derivedFlag.equalsIgnoreCase("true"))
+          includeDerived = true;
+        else if ( ! derivedFlag.equalsIgnoreCase("false"))
+          throw new ResourceException(Status.CLIENT_ERROR_BAD_REQUEST, "Invalid value for parameter 'includeDerived'. Supported values are 'true' and 'false'.");
+      }
+
       
       typeVal = (String) getRequest().getAttributes().get("type");
       this.type = null;
@@ -143,7 +154,7 @@ public class NeighborhoodResource extends BaseResource {
       {
         graph = OntGraph.getAllEdges(inputStr, kbId,inputType, getOntoquestContext());
       } else {
-        graph = OntGraph.get(inputStr, type, kbId,attributes, inputType, getOntoquestContext(), lmt);
+        graph = OntGraph.get(inputStr, type, kbId,attributes, inputType, getOntoquestContext(), lmt,includeDerived);
       }
       long t2 = Calendar.getInstance().getTimeInMillis();
       
