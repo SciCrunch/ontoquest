@@ -30,7 +30,7 @@ public class OntGraphTest extends OntoquestTestAdapter {
   public void testGetSubclasses() throws OntoquestException {
     String id = "316108-1";
     attributes.put("level", 3);
-    OntGraph g = OntGraph.get(id, OntGraph.NeighborType.SUBCLASSES, kbid, attributes, OntGraph.InputType.OID,context,1000);
+    OntGraph g = OntGraph.get(id, OntGraph.NeighborType.SUBCLASSES, kbid, attributes, OntGraph.InputType.OID,context,1000,true);
 //    ClassNode node = ClassNode.get(id, context);
 //    assertTrue(g.getNodes().size() > 0);
     assertTrue(g.getEdges().size() > 0); 
@@ -44,7 +44,7 @@ public class OntGraphTest extends OntoquestTestAdapter {
     String name = "PRO_000000001";
     attributes.put("level", 0);
     long time1 = System.currentTimeMillis();
-    OntGraph g = OntGraph.get(name, OntGraph.NeighborType.SUBCLASSES, kbid, attributes, OntGraph.InputType.NAME,context,100);
+    OntGraph g = OntGraph.get(name, OntGraph.NeighborType.SUBCLASSES, kbid, attributes, OntGraph.InputType.NAME,context,100,true);
 //    ClassNode node = ClassNode.get(id, context);
 //    assertTrue(g.getNodes().size() > 0);
     assertTrue(g.getEdges().size() > 0); 
@@ -57,7 +57,7 @@ public class OntGraphTest extends OntoquestTestAdapter {
 
   public void testGetSuperclasses() throws OntoquestException {
     attributes.put("level", 3);
-    OntGraph g = OntGraph.get("cerebellum", OntGraph.NeighborType.SUPERCLASSES, kbid, attributes, OntGraph.InputType.TERM,context,1000);
+    OntGraph g = OntGraph.get("cerebellum", OntGraph.NeighborType.SUPERCLASSES, kbid, attributes, OntGraph.InputType.TERM,context,1000,true);
 //    ClassNode node = ClassNode.get(id, context);
 //    assertTrue(g.getNodes().size() > 0);
     assertTrue(g.getEdges().size() > 0); 
@@ -69,7 +69,7 @@ public class OntGraphTest extends OntoquestTestAdapter {
   public void testGetParts() throws OntoquestException {
     String name = "birnlex_1489";
     attributes.put("level", 1);
-    OntGraph g = OntGraph.get(name, OntGraph.NeighborType.PARTS, kbid, attributes, OntGraph.InputType.NAME, context,1000);
+    OntGraph g = OntGraph.get(name, OntGraph.NeighborType.PARTS, kbid, attributes, OntGraph.InputType.NAME, context,1000,true);
 //    assertTrue(g.getNodes().size() > 0);
     assertTrue(g.getEdges().size() > 0);
     for (Relationship r : g.getEdges()) {
@@ -87,7 +87,7 @@ public class OntGraphTest extends OntoquestTestAdapter {
       int rtid = rs.getInt(2);
       String id = rid + "-" + rtid;
       OntGraph g = OntGraph.get(id, OntGraph.NeighborType.PARENTS, kbid, attributes, 
-                                OntGraph.InputType.OID, context,1000);
+                                OntGraph.InputType.OID, context,1000,true);
 //      assertTrue(g.getNodes().size() > 0);
       for (Relationship r : g.getEdges()) {
         System.out.println(r.getLabel1() + " " + r.getPname() + " " + r.getLabel2());
@@ -99,7 +99,7 @@ public class OntGraphTest extends OntoquestTestAdapter {
   public void testGetWhole() throws OntoquestException {
     String name = "birnlex_1146";
     attributes.put("level", 3);
-    OntGraph g = OntGraph.get(name, OntGraph.NeighborType.WHOLE, kbid, attributes, OntGraph.InputType.NAME, context,1000);
+    OntGraph g = OntGraph.get(name, OntGraph.NeighborType.WHOLE, kbid, attributes, OntGraph.InputType.NAME, context,1000,true);
 //    assertTrue(g.getNodes().size() > 0);
     assertTrue(g.getEdges().size() > 0);
     for (Relationship r : g.getEdges()) {
