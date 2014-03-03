@@ -151,7 +151,7 @@ public class ScriptRunner {
 			HashMap<String, String> inputRow = new HashMap<String, String>();
 			inputRow.put(":ontName", this.ontName);
 			inputRow.put(":finalName", this.finalOntName);
-			inputRow.put(":oldName", this.ontName + "_old");
+			inputRow.put(":oldName", this.finalOntName + "_old");
 
 			File schemaFile = AllConfiguration.getFile(scriptName);
 			if (log.isInfoEnabled()) {
