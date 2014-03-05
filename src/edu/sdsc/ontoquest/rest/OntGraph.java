@@ -334,28 +334,26 @@ public class OntGraph extends BaseBean {
       edgeTableName = "graph_edges";
     }
     
-
     String lterm = inputStr.toLowerCase();
+    String getRidsubQuery = "select distinct rid, rtid from graph_nodes where rtid = 1 and (lower(name) = '"
+         + lterm + "' or lower(label) = '" + lterm + "') and kbid = "+ kbId;
+    String getRidIncludeSynonymSubQuery = 
+             "select distinct r.subjectid as rid, subject_rtid as rtid " + 
+             "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
+             "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
+             " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
+             " and p.name = sp.property_name and r.kbid = " + kbId + 
+              " union "+ getRidsubQuery;
     if (edgeType == GetNeighbors.EDGE_OUTGOING) {
       return "select n0.rid, n0.rtid, gn.label, e.rid2, e.rtid2, n2.label, e.pid , gp.label, gn.name, n2.name, gp.name " +
-         "from " + edgeTableName + " e, " + 
-         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
-         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
-         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
-         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
-         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "from " + edgeTableName + " e, (" + getRidIncludeSynonymSubQuery + ") n0, " +
          "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
          "where n0.rid = e.rid1 and e.rtid1 = 1 and n2.rid = e.rid2 and " +
          "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
     } else if ( edgeType == GetNeighbors.EDGE_INCOMING) 
     {
       return "select n2.rid, n2.rtid, n2.label, e.rid2, e.rtid2, gn.label, e.pid , gp.label, n2.name, gn.name, gp.name " +
-         "from " + edgeTableName + " e, " + 
-         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
-         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
-         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
-         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
-         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "from " + edgeTableName + " e, ("+ getRidIncludeSynonymSubQuery + ") n0, " +
          "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
          "where n0.rid = e.rid2 and e.rtid1 = 1 and n2.rid = e.rid1 and " +
          "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
@@ -364,23 +362,13 @@ public class OntGraph extends BaseBean {
       return 
           "(" +
           "select n0.rid, n0.rtid, gn.label, e.rid2, e.rtid2, n2.label, e.pid , gp.label, gn.name, n2.name, gp.name " +
-         "from " + edgeTableName + " e, " + 
-         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
-         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
-         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
-         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
-         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "from " + edgeTableName + " e, ("+ getRidIncludeSynonymSubQuery + ") n0, " +
          "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
          "where n0.rid = e.rid1 and e.rtid1 = 1 and n2.rid = e.rid2 and " +
          "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid " +
          " ) union ("  +  
          "select n2.rid, n2.rtid, n2.label, e.rid2, e.rtid2, gn.label, e.pid , gp.label, n2.name, gn.name, gp.name " +
-         "from " + edgeTableName + " e, " + 
-         "(select distinct r.subjectid as rid, subject_rtid as rtid " + 
-         "from graph_nodes n1, relationship r, property p, synonym_property_names sp " + 
-         "where (lower(n1.name) = '"+ lterm + "' or lower(n1.label) = '" + lterm + "')" + 
-         " and r.subject_rtid = 1 and n1.rid = r.objectid and n1.rtid = r.object_rtid and p.id = r.propertyid \n" + 
-         " and p.name = sp.property_name and r.kbid = " + kbId + ") n0, " +
+         "from " + edgeTableName + " e, ("+ getRidIncludeSynonymSubQuery + ") n0, " +
          "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
          "where n0.rid = e.rid2 and e.rtid1 = 1 and n2.rid = e.rid1 and " +
          "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid" +
