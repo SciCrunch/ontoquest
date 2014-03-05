@@ -152,13 +152,23 @@ public class ClassNodeResource extends BaseResource {
 		if (term != null) {
 			term = Reference.decode(term);
       
-		  getClassesFromTerm(kbId, term);
+      if (term.toLowerCase().startsWith("http://")) 
+        getClassesFromURI(kbId, term);
+		  else 
+        getClassesFromTerm(kbId, term);
 			// return ClassNode.getByLabel(term, kbId, getOntoquestContext());
 		}
 
 		String query = (String)getRequest().getAttributes().get("query");
 		if (!Utility.isBlank(query)) {
 			query = Reference.decode(query);
+      
+      if ( query.toLowerCase().startsWith("http://")) 
+      {
+        getClassesFromURI(kbId, query);
+        return classNodes;
+      }
+      
 			return ClassNode.search(query, getRequest().getAttributes(), kbId, getOntoquestContext());
 		}
 
@@ -214,11 +224,10 @@ public class ClassNodeResource extends BaseResource {
     
     String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.kbid = " +
                  KBid + " and ( lower(name) = '" + lterm + "' or lower(label) = '" + lterm + 
-                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges r1, property p " +
+                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges r1, property p, synonym_property_names sp " +
                  "where n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
       KBid + " and ( lower(n1.name) = '" + 
-      lterm + "' or lower(n1.label) = '" + lterm + "') and p.name in ('prefLabel', 'label', 'synonym', 'abbrev', 'hasExactSynonym', 'hasRelatedSynonym', "+
-    "'acronym', 'taxonomicCommonName', 'ncbiTaxScientificName', 'ncbiTaxGenbankCommonName', 'ncbiTaxBlastName', 'ncbiIncludesName', 'ncbiInPartName', 'hasNarrowSynonym', 'misspelling', 'misnomer', 'hasBroadSynonym')"; 
+      lterm + "' or lower(n1.label) = '" + lterm + "') and p.name = sp.property_name"; 
     
     List<Variable> varList = new ArrayList<Variable>(2);
     varList.add(new Variable(1));
@@ -235,5 +244,14 @@ public class ClassNodeResource extends BaseResource {
     r.close();
     
   }
+
+  private void getClassesFromURI(int KBid, String uri) throws OntoquestException
+  {
+      classNodes = new HashMap<String,ClassNode>();
+      ClassNode node = new ClassNode(KBid, uri, getOntoquestContext());
+      
+      classNodes.put(ClassNode.generateId( node.getRid(), node.getRtid()), node);
+  }
+
   
 }

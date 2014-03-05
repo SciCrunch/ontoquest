@@ -549,9 +549,9 @@ public class ClassNode extends BasicClassNode {
       throw new OntoquestException ("Class id " + rid + " not found in knowledge base " + kbid);
     
     // get properties 
-    sql = "select p.name, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
+    sql = "select p.label, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
     "from graph_edges_raw e join graph_nodes n2 on n2.rid = e.rid2 and n2.rtid = e.rtid2 " + 
-    " join property p on p.id = e.pid " + 
+    " join graph_nodes p on (p.rid = e.pid and p.rtid = 15)" + 
     "where e.rid1 = "+rid +" and  e.rtid1 =1 and e.kbid= " + kbid;
     
     varList = new ArrayList<Variable>(6);
@@ -610,6 +610,13 @@ public class ClassNode extends BasicClassNode {
     rs.close();
   }
 
+  /**
+   *  construnct a Class node from its URI
+   * @param kbid
+   * @param uri  URI of the class.
+   * @param context Context to Ontoquest database.
+   * @throws OntoquestException
+   */
   public ClassNode (int kbid, String uri, Context context) throws OntoquestException
   {
     int rid = -1;
@@ -625,6 +632,15 @@ public class ClassNode extends BasicClassNode {
       rid = r.getInt(1);
     }
     r.close();
+    
+    setRid (rid); 
+    setRtid (1);
+
+    this.comments = new ArrayList<String>(5);
+    this.synonyms = new ArrayList<String>(5);
+    this.otherProperties = new ArrayList<String[]> (20);
+    this.superclasses = new ArrayList<SimpleClassNode> (5);
+  
     populateClassNode(kbid, rid, context);  
   }
   
