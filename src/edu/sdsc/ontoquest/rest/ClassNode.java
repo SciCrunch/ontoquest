@@ -29,6 +29,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.TreeMap;
 
+import org.semanticweb.owlapi.model.IRI;
+
 
 /**
  * @version $Id: ClassNode.java,v 1.6 2013-10-29 23:52:45 jic002 Exp $
@@ -520,96 +522,112 @@ public class ClassNode extends BasicClassNode {
     
     if (rrid == -1)  // rid is not in an equivalent class group
     {  */
-      // get the node infor first
-      String sql = "select label, name, uri from graph_nodes where kbid = " +kbid + 
-             " and rid ="+ rid + " and rtid=1";
-
-      List<Variable> varList = new ArrayList<Variable>(3);
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      
-      ResourceSet r = DbUtility.executeSQLQuery(sql, context, varList, null, 
-          "Error occured when getting class node info for node " + rid,-1);
-      while (r.next()) {
-        setLabel( r.getString(1));
-        setName ( r.getString(2));
-        setURI(r.getString(3));
-      }
-      r.close();
-      if ( getName() == null ) 
-        throw new OntoquestException ("Class id " + rid + " not found in knowledge base " + kbid);
-      
-      // get properties 
-      sql = "select p.name, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
-      "from graph_edges e join graph_nodes n2 on n2.rid = e.rid2 and n2.rtid = e.rtid2 " + 
-      " join property p on p.id = e.pid left outer join graph_nodes n1 on " + 
-      " n1.rid = e.org_rid1 and n1.rtid = 1 " + 
-      "where e.rid1 = 1119328 and e.org_rid1 is null and e.rtid1 = 1 and (not e.derived) and e.kbid= " + kbid +
-      " union select p.name, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
-      "from graph_edges e join graph_nodes n2 on n2.rid = e.rid2 and n2.rtid = e.rtid2 " + 
-      "join property p on p.id = e.pid left outer join graph_nodes n1 on " + 
-      "n1.rid = e.org_rid1 and n1.rtid = 1 " + 
-      "where e.org_rid1 = "+ rid + " and e.rtid1 = 1 and (not e.derived) and e.kbid=" + kbid ;
-
-      varList = new ArrayList<Variable>(6);
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-
-      ResourceSet rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
-          "Error occured when getting properties of class node " + rid,-1);
-      while (rs.next()) {
-        String prop = rs.getString(1);
-        String val = rs.getString(3);
-        if (val == null || val.length() == 0 || prop.equals("label"))
-          continue;
-       // int n2rid = rs.getInt(4);
-       // String term = rs.getString(2);
-
-        //populating properties
-        if (getDefinitionPropertySet().contains(prop)) { // a definition edge
-          comments.add(val+" ["+prop+"]");
-        } else if (prop.equals(definitionProperty)) {
-           setDefinition(val);
-        } else if (getSynonymPropertySet().contains(prop)){ // synonym edge
-            synonyms.add(val);
-        } else if (rs.getInt(5) == 13) { // other properties, 13 means literal.
-          otherProperties.add(new String[]{prop, val});
-        }
-      }
-      rs.close();
-//    }
-
-    // get subclass info
-    sql = "select n.rid, n.rtid, n.name, n.label, n.uri from subclassof s join " + 
-            " graph_nodes n on s.parentid = n.rid where n.rtid=1 and s.kbid = " + kbid + 
-            " and s.childid = " + rid;
-
-      varList = new ArrayList<Variable>(5);
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-      varList.add(new Variable(1));
-
-    rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
-        "Error occured when getting parent classes of class node " + rid,-1);
-    while (rs.next()) {
-      superclasses.add(new SimpleClassNode (rs.getInt(1),
-                                            rs.getInt(2),
-                                            rs.getString(3),  //name
-                                            rs.getString(4),  //Label 
-                                            rs.getString(5)));  //URI
-    }
-    rs.close();
-      
-    
+    populateClassNode(kbid, rid, context);  
   }
 
+  private void populateClassNode(int kbid, int rid, Context context) throws OntoquestException 
+  {
+
+    // get the node infor first
+    String sql = "select label, name, uri from graph_nodes where kbid = " +kbid + 
+           " and rid ="+ rid + " and rtid=1";
+
+    List<Variable> varList = new ArrayList<Variable>(3);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    
+    ResourceSet r = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting class node info for node " + rid,-1);
+    while (r.next()) {
+      setLabel( r.getString(1));
+      setName ( r.getString(2));
+      setURI(r.getString(3));
+    }
+    r.close();
+    if ( getName() == null ) 
+      throw new OntoquestException ("Class id " + rid + " not found in knowledge base " + kbid);
+    
+    // get properties 
+    sql = "select p.name, n2.name, n2.label, n2.rid, n2.rtid, n2.uri " + 
+    "from graph_edges_raw e join graph_nodes n2 on n2.rid = e.rid2 and n2.rtid = e.rtid2 " + 
+    " join property p on p.id = e.pid " + 
+    "where e.rid1 = "+rid +" and  e.rtid1 =1 and e.kbid= " + kbid;
+    
+    varList = new ArrayList<Variable>(6);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+
+    ResourceSet rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting properties of class node " + rid,-1);
+    while (rs.next()) {
+      String prop = rs.getString(1);
+      String val = rs.getString(3);
+      if (val == null || val.length() == 0 || prop.equals("label"))
+        continue;
+     // int n2rid = rs.getInt(4);
+     // String term = rs.getString(2);
+
+      //populating properties
+      if (getDefinitionPropertySet().contains(prop)) { // a definition edge
+        comments.add(val+" ["+prop+"]");
+      } else if (prop.equals(definitionProperty)) {
+         setDefinition(val);
+      } else if (getSynonymPropertySet().contains(prop)){ // synonym edge
+          synonyms.add(val);
+      } else if (rs.getInt(5) == 13) { // other properties, 13 means literal.
+        otherProperties.add(new String[]{prop, val});
+      }
+    }
+    rs.close();
+    //    }
+
+    // get subclass info
+    sql = "select n.rid, n.rtid, n.name, n.label, n.uri from subclassof s join " +
+          " graph_nodes n on s.parentid = n.rid where n.rtid=1 and s.kbid = " + kbid + 
+          " and s.childid = " + rid;
+
+    varList = new ArrayList<Variable>(5);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+
+    rs = DbUtility.executeSQLQuery(sql, context, varList, null,
+      "Error occured when getting parent classes of class node " + rid,-1);
+    while (rs.next()) {
+    superclasses.add(new SimpleClassNode (rs.getInt(1),
+                                          rs.getInt(2),
+                                          rs.getString(3),  //name
+                                          rs.getString(4),  //Label 
+                                          rs.getString(5)));  //URI
+    }
+    rs.close();
+  }
+
+  public ClassNode (int kbid, String uri, Context context) throws OntoquestException
+  {
+    int rid = -1;
+    String sql = "select rid from graph_nodes where kbid = " +kbid + 
+           " and uri ='"+ uri + "' and rtid=1";
+
+    List<Variable> varList = new ArrayList<Variable>(1);
+    varList.add(new Variable(1));
+    
+    ResourceSet r = DbUtility.executeSQLQuery(sql, context, varList, null, 
+        "Error occured when getting class id for " + uri,-1);
+    while (r.next()) {
+      rid = r.getInt(1);
+    }
+    r.close();
+    populateClassNode(kbid, rid, context);  
+  }
+  
 	@Override
 	public boolean equals(Object o) {
 		if (!(o instanceof ClassNode)) 
