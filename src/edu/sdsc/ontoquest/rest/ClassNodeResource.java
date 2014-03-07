@@ -222,10 +222,10 @@ public class ClassNodeResource extends BaseResource {
   {
     String lterm= term.toLowerCase();
     
-    String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.kbid = " +
+    String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.rtid=1 and n.kbid = " +
                  KBid + " and ( lower(name) = '" + lterm + "' or lower(label) = '" + lterm + 
-                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges r1, property p, synonym_property_names sp " +
-                 "where n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
+                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges_raw r1, property p, synonym_property_names sp " +
+                 "where r1.rtid1 = 1 and n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
       KBid + " and ( lower(n1.name) = '" + 
       lterm + "' or lower(n1.label) = '" + lterm + "') and p.name = sp.property_name"; 
     
