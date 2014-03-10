@@ -220,8 +220,9 @@ public class ClassNodeResource extends BaseResource {
    */
   private void getClassesFromTerm(int KBid, String term) throws OntoquestException
   {
+    classNodes = new HashMap<String,ClassNode>();
+
     String lterm= term.toLowerCase();
-    
     String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.rtid=1 and n.kbid = " +
                  KBid + " and ( lower(name) = '" + lterm + "' or lower(label) = '" + lterm + 
                  "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges_raw r1, property p, synonym_property_names sp " +
@@ -232,13 +233,13 @@ public class ClassNodeResource extends BaseResource {
     List<Variable> varList = new ArrayList<Variable>(2);
     varList.add(new Variable(1));
     varList.add(new Variable(1));
+
     
     ResourceSet r = DbUtility.executeSQLQuery(sql, getOntoquestContext(), varList, null, "Error occured when getting rids of the search term " + term,-1);
     while (r.next()) {
       int rid1 = r.getInt(1);
       int rtid1 = r.getInt(2);
       
-      classNodes = new HashMap<String,ClassNode>();
       classNodes.put(ClassNode.generateId(rid1, rtid1), new ClassNode(KBid, rid1, getOntoquestContext()));
     }
     r.close();
