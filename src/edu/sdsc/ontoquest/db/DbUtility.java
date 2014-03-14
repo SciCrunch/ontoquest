@@ -27,9 +27,10 @@ import edu.sdsc.ontoquest.graph.InMemoryAdjMapGraph;
 import edu.sdsc.ontoquest.query.Utility;
 import edu.sdsc.ontoquest.query.Variable;
 
+
 /**
  * @version $Id: DbUtility.java,v 1.4 2013-09-24 23:08:50 jic002 Exp $
- * 
+ *
  */
 public class DbUtility {
 	private static Log logger = LogFactory.getLog(DbUtility.class);
@@ -96,7 +97,7 @@ public class DbUtility {
     
     if ( resultLimit > 0  ) 
     {
-      if ( ! sql.matches(".*\\s+ limit \\d+\\s*\\z") )
+      if ( ! sql.matches("(?is).* limit :?\\d+.*") )
       {
         sql = sql + " limit " + (resultLimit +1);
       }

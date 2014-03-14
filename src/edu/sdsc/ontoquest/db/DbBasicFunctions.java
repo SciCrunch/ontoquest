@@ -313,7 +313,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[6] = (resultLimit<=0)?"ALL":String.valueOf(resultLimit);
     
     return DbUtility.executeSQLQuery(sql, context, varList, args, 
-        "Failed to search name :" + strToSearch, -1);
+        "Failed to search name :" + strToSearch, resultLimit);
   }
    
   public ResourceSet searchTerm(String strToSearch, int[] kbid, Context context, 
@@ -356,7 +356,7 @@ public class DbBasicFunctions implements BasicFunctions {
     args[6] = (resultLimit<=0)?"ALL":String.valueOf(resultLimit);
     
     return DbUtility.executeSQLQuery(sql, context, varList, args, 
-        "Failed to search term :" + strToSearch, -1);
+        "Failed to search term :" + strToSearch, resultLimit);
   }
   
   /**
