@@ -69,13 +69,15 @@ public class ClassNodeTest extends OntoquestTestAdapter {
 		}
 	}
 
+/*
 	public void testSearch() throws OntoquestException {
 		String term = "Cerebellum";
-		HashMap<String, ClassNode> classNodes = ClassNode.search(term, attributes,
+		Map<String, ClassNode> classNodes = ClassNodeResource.search(term, attributes,
 				kbId, context);
 		for (ClassNode c : classNodes.values()) {
 			System.out.println(c.getLabel() + "; " + c.getName());
 			//      assertEquals(c.getLabel(), name);
-		}    
-	}
+		} 
+	} 
+  */
 }
