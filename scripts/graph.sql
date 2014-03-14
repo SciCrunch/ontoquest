@@ -641,12 +641,15 @@ CREATE OR REPLACE FUNCTION set_labels(theKbid INTEGER, setLabelFlag boolean) RET
   END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION set_obsolete_flag (theKbid INTEGER) RETURNS VOID AS $$
+
+CREATE OR REPLACE FUNCTION set_obsolete_flag(thekbid integer)
+  RETURNS void AS
+$BODY$
   /*
      set obsolete flag in nodes and edges table for the specified kbid. 
    */
   DECLARE
-    obsoleteClassNames TEXT := '''_birnlex_retired_class'', ''ObsoleteClass''';
+    obsoleteClassNames TEXT := '''_birnlex_retired_class'', ''ObsoleteClass'',''DeprecatedClass''';
     rec1 RECORD;
     rec RECORD;
     kbIdArray integer[];
@@ -661,20 +664,28 @@ CREATE OR REPLACE FUNCTION set_obsolete_flag (theKbid INTEGER) RETURNS VOID AS $
       ELSE
         idList := idList || ARRAY[[rec1.rid, rec1.rtid]];
       END IF;
-      -- update is_obsolete flag of top-level obsolete classes
-      update graph_nodes_all set is_obsolete = true where rid = rec1.rid and rtid = rec1.rtid;
+      -- update is_obsolete flag of top-level obsolete classes -- the following line is removed by cj.
+      -- update graph_nodes_all set is_obsolete = true where rid = rec1.rid and rtid = rec1.rtid;
     END LOOP;
 
+    update graph_nodes_all n
+        set is_obsolete = true 
+    where n.kbid = theKbId and n.is_obsolete = false and n.rtid = 1 and 
+       exists ( select 1 from graph_edges_all e, literal l where e.kbid = theKbid and 
+               e.rid1 = n.rid and e.rtid1 = 1 and e.rtid2 = 13 and l.id = e.rid2 and l.lexicalform = 'true' and 
+               e.pid = (select rid from graph_nodes_all n0 where n0.rtid = 15 
+                           and n0.kbid = theKbid and n0.uri = 'http://www.w3.org/2002/07/owl#deprecated'));
+   
     -- if no ID is found, return
     IF idList is null THEN
       RETURN;
     END IF;
 
     -- fetch subclasses of obsolete classes
-    FOR rec IN select * from get_neighborhood(idList, '''subClassOf''', null, theKbId, false, 0, false, true, false, true)
+    FOR rec IN select * from get_neighborhood(idList, '''subClassOf''', null, theKbId, false, 0, false, true, true, true)
     LOOP
       -- update the is_obsolete flag of these subclasses
-      update graph_nodes_all set is_obsolete = true where rid = rec.rid1 and rtid = rec.rtid1;
+      update graph_nodes_all set is_obsolete = true where rid = rec.rid1 and rtid = rec.rtid1 and is_obsolete = false ;
     END LOOP;
 
     -- update the is_obsolete flag in edge tables
@@ -682,7 +693,10 @@ CREATE OR REPLACE FUNCTION set_obsolete_flag (theKbid INTEGER) RETURNS VOID AS $
       (rid1, rtid1) in (select rid, rtid from graph_nodes_all where is_obsolete = true) or
       (rid2, rtid2) in (select rid, rtid from graph_nodes_all where is_obsolete = true);
   END;
-$$ LANGUAGE plpgsql;
+$BODY$
+  LANGUAGE plpgsql VOLATILE
+  COST 100;
+
 
 CREATE OR REPLACE FUNCTION update_inference_edges(theKbid integer) 
   RETURNS VOID AS $$
@@ -1164,6 +1178,7 @@ $BODY$
     DELETE FROM graph_edges_all where kbid = theKbid;
     DELETE FROM graph_nodes_all where kbid = theKbid;
     delete from graph_edges_raw where kbid = theKbid;
+    delete from equivalentclassgroup where kbid = theKbid; 
     raise notice 'Clean up graph_edges_all, graph_edges_raw and graph_nodes_all table.';
 
     SELECT p.id, rt.id INTO owlRestrictionRid, owlRestrictionRtid FROM primitiveclass p, resourcetype rt where p.name = 'Restriction' and rt.rtype = 'c' and is_system = true and kbid = theKbid;
