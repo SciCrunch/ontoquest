@@ -47,7 +47,7 @@ public class SearchReconcileBean extends BaseBean {
 
 		String query = queryObj.getString("query");
 
-		int limit = ClassNode.DefaultResultLimit;
+		int limit = ClassNodeResource.DefaultResultLimit;
 		if (queryObj.has("limit")) {
 			limit = queryObj.optInt("limit");
 		}
@@ -74,7 +74,7 @@ public class SearchReconcileBean extends BaseBean {
 			}
 		}
 
-		int maxEditDistance = ClassNode.DefaultMaxEditDistance;
+		int maxEditDistance = ClassNodeResource.DefaultMaxEditDistance;
 		Object medObj = attributes.get("max_ed");
 		if (medObj != null) {
 			try {
