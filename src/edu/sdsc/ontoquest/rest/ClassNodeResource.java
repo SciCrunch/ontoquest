@@ -26,6 +26,9 @@ import edu.sdsc.ontoquest.rest.BaseBean.SiblingsType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
 /**
  * @version $Id: ClassNodeResource.java,v 1.3 2013-06-21 22:28:27 jic002 Exp $
@@ -33,12 +36,15 @@ import java.util.List;
  */
 public class ClassNodeResource extends BaseResource {
 
+  public static final int DefaultResultLimit = 100;
+
+  public static final int DefaultMaxEditDistance = 50;
 	
   /** 
    * key of the map is a composite id in a string fromat generated from 
    * funnction generateId(rid, rtid). Example is '1233444-1'
    */
-  private HashMap<String, ClassNode> classNodes = null;
+  private Map<String, ClassNode> classNodes = null;
 
 	@Override
 	protected void doInit() throws ResourceException {
@@ -73,7 +79,7 @@ public class ClassNodeResource extends BaseResource {
 		}
 	}
 
-	private void fetchSuperclasses(HashMap<String, ClassNode> classNodes, int kbid)
+	private void fetchSuperclasses(Map<String, ClassNode> classNodes, int kbid)
 			throws OntoquestException {
 		if (classNodes == null || classNodes.size() == 0)
 			return;
@@ -105,7 +111,7 @@ public class ClassNodeResource extends BaseResource {
 		}
 	}
 
-	private HashMap<String, ClassNode> getClassNodes(int kbId)
+	private Map<String, ClassNode> getClassNodes(int kbId)
 			throws OntoquestException {
 		// check if the request is to get siblings
 		String typeVal = (String) getRequest().getAttributes().get("type");
@@ -155,8 +161,9 @@ public class ClassNodeResource extends BaseResource {
       if (term.toLowerCase().startsWith("http://")) 
         getClassesFromURI(kbId, term);
 		  else 
-        getClassesFromTerm(kbId, term);
+        classNodes = getClassesFromTerm(kbId, term);
 			// return ClassNode.getByLabel(term, kbId, getOntoquestContext());
+      return classNodes;
 		}
 
 		String query = (String)getRequest().getAttributes().get("query");
@@ -169,10 +176,11 @@ public class ClassNodeResource extends BaseResource {
         return classNodes;
       }
       
-			return ClassNode.search(query, getRequest().getAttributes(), kbId, getOntoquestContext());
+			classNodes= search(query, getRequest().getAttributes(), kbId, getOntoquestContext());
+      return classNodes;
 		}
 
-		return classNodes;
+		throw new OntoquestException("Unknow search command received. Please check the documentation and construct a valid URL");
 
 	}
 
@@ -218,15 +226,15 @@ public class ClassNodeResource extends BaseResource {
    * @param KBid
    * @param term
    */
-  private void getClassesFromTerm(int KBid, String term) throws OntoquestException
+  private HashMap<String,ClassNode> getClassesFromTerm(int KBid, String term) throws OntoquestException
   {
-    classNodes = new HashMap<String,ClassNode>();
+    HashMap<String,ClassNode> resultMap = new HashMap<String,ClassNode>();
 
     String lterm= term.toLowerCase();
     String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.rtid=1 and n.kbid = " +
                  KBid + " and ( lower(name) = '" + lterm + "' or lower(label) = '" + lterm + 
-                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n1, graph_edges_raw r1, property p, synonym_property_names sp " +
-                 "where r1.rtid1 = 1 and n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
+                 "') union select rid1 as theRid, rtid1 as theRtid from graph_nodes n0, graph_nodes n1, graph_edges_raw r1, property p, synonym_property_names sp " +
+                 "where r1.rid1 = n0.rid and r1.rtid1 = 1 and n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
       KBid + " and ( lower(n1.name) = '" + 
       lterm + "' or lower(n1.label) = '" + lterm + "') and p.name = sp.property_name"; 
     
@@ -240,10 +248,11 @@ public class ClassNodeResource extends BaseResource {
       int rid1 = r.getInt(1);
       int rtid1 = r.getInt(2);
       
-      classNodes.put(ClassNode.generateId(rid1, rtid1), new ClassNode(KBid, rid1, getOntoquestContext()));
+      resultMap.put(ClassNode.generateId(rid1, rtid1), new ClassNode(KBid, rid1, getOntoquestContext()));
     }
     r.close();
     
+    return resultMap;
   }
 
   private void getClassesFromURI(int KBid, String uri) throws OntoquestException
@@ -254,5 +263,99 @@ public class ClassNodeResource extends BaseResource {
       classNodes.put(ClassNode.generateId( node.getRid(), node.getRtid()), node);
   }
 
-  
+  /**
+   * Search concepts by input <code>term</code>.
+   * @param term the search term
+   * @param attributes optional request parameters.
+   * @param defaultKbId the default kbid. If no kbid is specified, the default kbid is used. 
+   * The default kb name is declared in web.xml.
+   * @param context ontoquest context
+   * @return
+   * @throws OntoquestException
+   */
+  private Map<String, ClassNode> search(String term,
+      Map<String, Object> attributes, int kbId, Context context)
+          throws OntoquestException {
+    // 1. prepare input parameters
+    //    int kbId = defaultKbId;
+    //    Object kbObj = attributes.get("ontology");
+    //    if (kbObj != null) {
+    //      String kbStr = Reference.decode((String)kbObj);
+    //      kbId = getBasicFunctions().getKnowledgeBaseID(kbStr, context);
+    //    }
+
+    int resultLimit = DefaultResultLimit;
+    Object rlObj = attributes.get("result_limit");
+    if (rlObj != null) {
+      try {
+        resultLimit = Integer.parseInt(rlObj.toString());
+      } catch (Exception e) {
+        // do nothing, use default
+      }
+    }
+
+    boolean beginWith = false;
+    Object bwObj = attributes.get("begin_with");
+    if (bwObj != null) {
+      try {
+        beginWith = Boolean.parseBoolean(bwObj.toString());
+      } catch (Exception e) {
+        // do nothing, use default
+      }
+    }
+
+    int maxEditDistance = DefaultMaxEditDistance;
+    Object medObj = attributes.get("max_ed");
+    if (medObj != null) {
+      try {
+        maxEditDistance = Integer.parseInt(medObj.toString());
+      } catch (Exception e) {
+        // do nothing, use default
+      }
+    }
+
+    boolean negated = false;
+    Object nObj = attributes.get("negated");
+    if (nObj != null) {
+      try {
+        negated = Boolean.parseBoolean(nObj.toString());
+      } catch (Exception e) {
+        // do nothing, use default
+      }
+    }
+
+    // 2. Find matching terms first
+    ResourceSet rs = ClassNode.getBasicFunctions().searchTerm(term, new int[]{kbId}, 
+                                                              context, ClassNode.getVarList1(), 
+        resultLimit, negated, maxEditDistance, beginWith);
+    TreeSet<String> matchedTerms = new TreeSet<String>();
+    while (rs.next()) {
+      matchedTerms.add(rs.getString(1).toLowerCase());
+    }
+    rs.close();
+
+    if (matchedTerms.size() == 0) {
+      return new HashMap<String, ClassNode>(); // no match, return empty result.
+    }
+
+    // 3. Fetch corresponding ClassNode objects for the matching terms.
+    TreeMap <String, ClassNode> result = new TreeMap <String,ClassNode> ();
+    int counter = 0;
+    for (String termStr : matchedTerms) 
+    {
+      Map<String, ClassNode> nodemap = getClassesFromTerm(kbId, termStr);
+      for (Map.Entry<String, ClassNode> r : nodemap.entrySet())
+      {
+        if ( !result.containsKey(r.getKey())) 
+        {
+          result.put(r.getKey(), r.getValue());
+          counter++;
+          if ( resultLimit >0 && counter == resultLimit )
+             break;
+        }
+      }
+    }
+    
+    return result;
+  }
 }

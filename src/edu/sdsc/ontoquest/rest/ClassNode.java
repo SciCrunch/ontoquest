@@ -29,6 +29,8 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.TreeMap;
 
+import java.util.TreeSet;
+
 import org.semanticweb.owlapi.model.IRI;
 
 
@@ -105,7 +107,7 @@ public class ClassNode extends BasicClassNode {
 
 	private static HashMap<String, ClassNode> getNodeMap(
 			OntoquestFunction<ResourceSet> f,
-			boolean useLabel, int[][] ontoIDs, Context context)
+			boolean useLabel, Context context)
 					throws OntoquestException {
 
 		// use a hash table to store results. 
@@ -321,7 +323,7 @@ public class ClassNode extends BasicClassNode {
 	 * @return
 	 * @throws OntoquestException
 	 */
-	public static HashMap<String, ClassNode> search(String term,
+/*	public static HashMap<String, ClassNode> search(String term,
 			Map<String, Object> attributes, int kbId, Context context)
 					throws OntoquestException {
 		// 1. prepare input parameters
@@ -375,9 +377,9 @@ public class ClassNode extends BasicClassNode {
 		// 2. Find matching terms first
 		ResourceSet rs = getBasicFunctions().searchTerm(term, new int[]{kbId}, context, getVarList1(), 
 				resultLimit, negated, maxEditDistance, beginWith);
-		LinkedList<String> matchedTerms = new LinkedList<String>();
+    TreeSet<String> matchedTerms = new TreeSet<String>();
 		while (rs.next()) {
-			matchedTerms.add(rs.getString(1));
+			matchedTerms.add(rs.getString(1).toLowerCase());
 		}
 		rs.close();
 
@@ -389,7 +391,7 @@ public class ClassNode extends BasicClassNode {
 		String[] terms = new String[matchedTerms.size()];
 		matchedTerms.toArray(terms);
 		return getByLabel(terms, kbId, context);
-	}
+	} */
   /* The following 4 attributes are removed since we extend this class from BasicClassNode now. 
 	private int rid;
 	private int rtid;
@@ -413,9 +415,6 @@ public class ClassNode extends BasicClassNode {
 	// Anita
 	private static     String[] getClassProperties = null;
 
-	public static final int DefaultResultLimit = 100;
-
-	public static final int DefaultMaxEditDistance = 50;
 
 	public static HashMap<String, ClassNode> get(int[][] ontoIDs, Context context)
 			throws OntoquestException {
@@ -424,7 +423,7 @@ public class ClassNode extends BasicClassNode {
 
 		OntoquestFunction<ResourceSet> f = new GetNeighbors(ontoIDs, 0, getClassProperties, null, 
 				GetNeighbors.EDGE_OUTGOING, true, false, 1, false);
-		return getNodeMap(f, true, ontoIDs, context);
+		return getNodeMap(f, true, context);
 	}
 
 	// private static Set<ClassNode> get(OntoquestFunction<ResourceSet> f,
@@ -465,16 +464,16 @@ public class ClassNode extends BasicClassNode {
      * */
 		OntoquestFunction<ResourceSet> f = new GetNeighbors(terms, kbId,
 				getClassProperties, null, true, GetNeighbors.EDGE_OUTGOING, true,
-				false, 1, false);
-		return getNodeMap(f, true, null, context);
+				false, 1, false,-1);
+		return getNodeMap(f, true, context);
 	}
-
-	public static HashMap<String, ClassNode> getByName(String name, int kbId,
+  
+ 	public static HashMap<String, ClassNode> getByName(String name, int kbId,
 			Context context) throws OntoquestException {
 		String[] names = name.split(";");
 		OntoquestFunction<ResourceSet> f = new GetNeighbors(names, kbId, true, getClassProperties, null,
 				GetNeighbors.EDGE_OUTGOING, true, false, 1, false);
-		return getNodeMap(f, false, null, context);
+		return getNodeMap(f, false, context);
 	}
 
 	public ClassNode(String id, String name, String label, List<String> comments, 
@@ -503,25 +502,6 @@ public class ClassNode extends BasicClassNode {
     this.otherProperties = new ArrayList<String[]> (20);
     this.superclasses = new ArrayList<SimpleClassNode> (5);
     
-    // first check if this rid is a member in the equivalent class group.
-    // set the representive class id. -1 mean rid is not a member. any possitive value
-    // means rid is in an equivalent class group and the rep node id is rrid
- /*   int rrid = -1;  
-    String sql = "select n.rid from equivalentclassgroup n where n.kbid = " +
-                 kbid + " and ridm = " + rid;
-    
-    List<Variable> varList = new ArrayList<Variable>(1);
-    varList.add(new Variable(1));
-    
-    ResourceSet r = DbUtility.executeSQLQuery(sql, context, varList, null, 
-        "Error occured when check if a class node is a member of equivalent class group.",-1);
-    while (r.next()) {
-      rrid = r.getInt(1);
-    }
-    r.close();
-    
-    if (rrid == -1)  // rid is not in an equivalent class group
-    {  */
     populateClassNode(kbid, rid, context);  
   }
 
