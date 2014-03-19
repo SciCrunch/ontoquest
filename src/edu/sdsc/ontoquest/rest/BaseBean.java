@@ -135,6 +135,7 @@ public abstract class BaseBean {
 		synonymPropertySet.add("ncbiIncludesName"); 
 		synonymPropertySet.add("ncbiInPartName"); 
 		synonymPropertySet.add("hasNarrowSynonym"); 
+	  synonymPropertySet.add("has_narrow_synonym");
 		synonymPropertySet.add("misspelling"); 
 		synonymPropertySet.add("misnomer"); 
 		synonymPropertySet.add("hasBroadSynonym"); 
