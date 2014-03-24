@@ -43,8 +43,8 @@ public class DbUtility {
 	private static final int NEWLINE = '\n';
 	private static final int SEMICOLON = ';';
 	private static final int EOF = -1;
-	private static final int ATSIGN = '@';
-	private static final int DOLLAR = '$';
+//	private static final int ATSIGN = '@';
+//	private static final int DOLLAR = '$';
 	public static final long DB_CONNECTION_WAIT_MS = 5000; // 5 second
 
 	public static boolean executeSQLCommand(String sql, Context context,
@@ -570,6 +570,9 @@ public class DbUtility {
 						while (rs.next()) {
 							System.out.println(rs.getString(1));
 						}
+            Statement stmt = rs.getStatement(); // fixing resource leaks -- cj
+            rs.close();
+            stmt.close();
 					} else {
 						sSql = replaceInputs(sSql, inputValues);
 						if (logger.isDebugEnabled()) {
