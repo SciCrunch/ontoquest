@@ -142,7 +142,7 @@ public class ClassNode extends BasicClassNode {
 			if (getDefinitionPropertySet().contains(prop)) { // a definition edge
 				List<String> comments = node.getComments();
 				comments.add(val+" ["+rs.getString(8)+"]");
-      } else if (prop.equals(definitionProperty)) {
+      } else if ( isDefinitionProperty(prop)) {
          node.setDefinition(val);
       } else if (getLabelPropertySet().contains(prop)) { // a label edge
 				if (!useLabel)
@@ -555,7 +555,7 @@ public class ClassNode extends BasicClassNode {
       //populating properties
       if (getDefinitionPropertySet().contains(prop)) { // a definition edge
         comments.add(val+" ["+prop+"]");
-      } else if (prop.equals(definitionProperty)) {
+      } else if ( isDefinitionProperty(prop) ) {
          setDefinition(val);
       } else if (getSynonymPropertySet().contains(prop)){ // synonym edge
           synonyms.add(val);

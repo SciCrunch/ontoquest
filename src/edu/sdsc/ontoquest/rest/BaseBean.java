@@ -10,11 +10,13 @@ import edu.sdsc.ontoquest.BasicFunctions;
 import edu.sdsc.ontoquest.db.DbBasicFunctions;
 import edu.sdsc.ontoquest.query.Variable;
 
+import java.util.TreeSet;
+
 /**
  * @version $Id: BaseBean.java,v 1.10 2013-10-29 23:52:11 jic002 Exp $
  * Base bean class that supports common behaviors or attributes shared by
  * all beans.
- * 
+ *
  */
 public abstract class BaseBean {
 	public enum InputType { OID, NAME, TERM, ID }
@@ -34,7 +36,19 @@ public abstract class BaseBean {
 	private static HashSet<String> synonymPropertySet = null;
 	private static BasicFunctions basicFunctions = DbBasicFunctions.getInstance();
   
-  public static final String definitionProperty = "definition";
+  private static TreeSet<String> definitionPropertySet2 =null;
+
+
+  public static boolean isDefinitionProperty(String str) 
+  {
+    if (definitionPropertySet2==null) 
+    {
+      definitionPropertySet2 = new TreeSet<String>();
+      definitionPropertySet2.add("definition");
+      definitionPropertySet2.add("IAO_0000115");
+    }
+    return definitionPropertySet2.contains(str);
+  }
 
 	/**
 	 * @return the basicFunctions

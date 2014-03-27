@@ -146,7 +146,9 @@ public class ClassNodeResource extends BaseResource {
 		String classId = (String) getRequest().getAttributes().get("classId");
 		if (classId != null) {
 			classId = Reference.decode(classId);
-			return ClassNode.getByName(classId, kbId, getOntoquestContext());
+			//return ClassNode.getByName(classId, kbId, getOntoquestContext());
+      classNodes = getClassesFromTermID(kbId,classId);
+      return classNodes;
 		}
 
 		String oid = (String) getRequest().getAttributes().get("oid");
@@ -223,8 +225,8 @@ public class ClassNodeResource extends BaseResource {
    * Get a collection of classes that related to the search term. Result is stored in 
    *  this.classNodes.
    * 
-   * @param KBid
-   * @param term
+   * @param KBid Internal identifier of the knowledge to search on.
+   * @param term Search term. It can be any prhase or term identifer.
    */
   private HashMap<String,ClassNode> getClassesFromTerm(int KBid, String term) throws OntoquestException
   {
@@ -254,6 +256,43 @@ public class ClassNodeResource extends BaseResource {
     
     return resultMap;
   }
+
+  /**
+   * Get a collection of classes that related to the search term identifier, for example HP_0000316. Result is stored in 
+   *  this.classNodes.
+   * 
+   * @param KBid Id of the Knowledge base.
+   * @param termId The term identifier, which is normally the fragment of the class URI.
+   */
+  private HashMap<String,ClassNode> getClassesFromTermID(int KBid, String termId) throws OntoquestException
+  {
+    HashMap<String,ClassNode> resultMap = new HashMap<String,ClassNode>();
+
+    String lterm= termId.toLowerCase();
+    String sql = "select n.rid as theRid, n.rtid as theRtid  from graph_nodes n where n.rtid=1 and n.kbid = " +
+                 KBid + " and lower(name) = '" + lterm + "' union select rid1 as theRid, rtid1 as theRtid from graph_nodes n0, graph_nodes n1, graph_edges_raw r1, property p, synonym_property_names sp " +
+                 "where r1.rid1 = n0.rid and r1.rtid1 = 1 and n1.rid = r1.rid2 and n1.rtid = r1.rtid2 and p.id = r1.pid and r1.kbid = " +
+      KBid + " and  lower(n1.name) = '" + 
+      lterm + "' and p.name = sp.property_name"; 
+    
+    List<Variable> varList = new ArrayList<Variable>(2);
+    varList.add(new Variable(1));
+    varList.add(new Variable(1));
+
+    
+    ResourceSet r = DbUtility.executeSQLQuery(sql, getOntoquestContext(), varList, null, "Error occured when getting rids of the search term ID" + termId,-1);
+    while (r.next()) {
+      int rid1 = r.getInt(1);
+      int rtid1 = r.getInt(2);
+      
+      resultMap.put(ClassNode.generateId(rid1, rtid1), new ClassNode(KBid, rid1, getOntoquestContext()));
+    }
+    r.close();
+    
+    return resultMap;
+  }
+
+
 
   private void getClassesFromURI(int KBid, String uri) throws OntoquestException
   {
