@@ -121,22 +121,34 @@ import edu.sdsc.ontoquest.loader.struct.NamespaceEntity;
 import edu.sdsc.ontoquest.loader.struct.OntNode;
 import edu.sdsc.ontoquest.loader.struct.OntNode.NodeType;
 import edu.sdsc.ontoquest.loader.struct.OntologyEntity;
+import edu.sdsc.ontoquest.model.KnowledgeBase;
 import edu.sdsc.ontoquest.query.Utility;
+
+import java.io.FileOutputStream;
+import java.io.FileReader;
+import java.io.Reader;
+
+import java.net.URI;
+
+import java.net.URL;
+
+import java.nio.CharBuffer;
 
 import org.semanticweb.owlapi.io.UnparsableOntologyException;
 import org.semanticweb.owlapi.model.OWLDisjointUnionAxiom;
-import org.semanticweb.owlapi.model.OWLOntologyCreationException;
+
 
 public class OwlLoader {
 	private static class Options {
-		@Option(name = "-c", usage = "configuration file (default: config/ontoquest.xml)")
-		public String configFilePath;
+		@Option(name = "-c",
+            usage = "configuration file (default: config/ontoquest.xml)")
+    private String configFilePath;
 
 		@Option(name = "-d", usage = "ontology file", required = true)
-		public String owlFilePath;
+    private String owlFilePath;
 
 		@Option(name = "-s", usage = "run post-processing script? (true|false, default=false)")
-		public boolean runPostScript = false;
+    protected boolean runPostScript = false;
 	}
 
 	private static final String DEFAULT_CONFIG_FILE = "config/ontoquest.xml";
@@ -155,12 +167,14 @@ public class OwlLoader {
 		cm.copyIn(sql, inStream);
 		inStream.close();
 		return true;
+  
 	}
 
-	public static void main(String[] args) throws Exception {
-		Options options = new Options();
-		CmdLineParser parser = new CmdLineParser(options);
-		parser.parseArgument(args);
+	public static void main(String[] args) {
+    try { 
+      Options options = new Options();
+		  CmdLineParser parser = new CmdLineParser(options);
+		  parser.parseArgument(args);
 
 		String configFilePath = (options.configFilePath != null) ? options.configFilePath
 				: DEFAULT_CONFIG_FILE;
@@ -172,6 +186,13 @@ public class OwlLoader {
 			loader.runPostScript();
 		}
 		System.exit(0);
+    } catch (Exception e ) 
+    {
+      log.error("Error:", e);
+       System.out.println(e.getMessage());
+       System.exit(-1);
+    }
+    
 	}
 
 	public static void printLine(PrintWriter writer, Object... values) {
@@ -209,7 +230,7 @@ public class OwlLoader {
 
 	private TmpDataManager tmpDataManager = null;
 
-	HashMap<Object, Integer> classCache = new HashMap<Object, Integer>();
+//	HashMap<Object, Integer> classCache = new HashMap<Object, Integer>();
 	HashMap<String, NamespaceEntity> prefixIDMap = new HashMap<String, NamespaceEntity>();
 
 	HashMap<OWLOntology, OntologyEntity> ontologyMap = new HashMap<OWLOntology, OntologyEntity>();
@@ -228,10 +249,11 @@ public class OwlLoader {
 		this.ontologyFilePath = ontologyFilePath;
 	}
 
+/*
 	private void addBuiltInEntities(OWLOntologyManager manager) {
 		//TODO
 	}
-
+*/
 	/**
 	 * delete the ontology in the database if it exists.
 	 * 
@@ -241,7 +263,7 @@ public class OwlLoader {
 	 * @throws ConfigurationException
 	 * @throws OntoquestException
 	 */
-	private boolean cleanKB(Connection con) throws SQLException,
+/*	private boolean cleanKB(Connection con) throws SQLException,
 	ConfigurationException, OntoquestException {
 		con.commit();
 		String sql = AllConfiguration.getConfig().getString(
@@ -254,7 +276,7 @@ public class OwlLoader {
 		// con.commit();
 		return result;
 	}
-
+*/
 	private String composeBrowserText(IRI entityIRI, NamespaceEntity ns) {
 		String browserText = entityIRI.toString();
 		if (ns != null) {
@@ -316,19 +338,30 @@ public class OwlLoader {
 					continue;
 
 				IRI classIRI = cls.getIRI();
-				NamespaceEntity ns = prefixIDMap.get(classIRI.getStart());
-				String browserText = composeBrowserText(classIRI, ns);
-				// String browserText = classIRI.toString();
-				// if (ns != null) {
-				// browserText = ":".equals(ns.getPrefix()) ? classIRI.getFragment()
-				// : ns.getPrefix() + classIRI.getFragment();
-				// }
+        String prefix = classIRI.getNamespace();
+        String fragment = classIRI.getFragment();
+        if (fragment == null)  
+        {
+          URI u = classIRI.toURI();
+          fragment = u.getFragment();
+          prefix = u.getScheme() + ":" + u.getSchemeSpecificPart()+"#";
+        }
+				NamespaceEntity ns = prefixIDMap.get(prefix);
+//				String browserText = composeBrowserText(classIRI, ns);
+			  String browserText = classIRI.toString();
+				if (ns != null) {
+          browserText = ":".equals(ns.getPrefix()) ? fragment : ns.getPrefix() + fragment;
+				}
+        
+        if (cls.isBuiltIn()) 
+          System.out.println(classIRI.toString() + " is system class.");
 				int classId = clsCounter.increment();
 				node.set(classIRI.toString(), NodeType.NamedClass,
 						classId, browserText);
 				BDBUtil.storeNode(tmpClassDB, classIRI.toString(), node);
+          
 				// line: id, name, nsid, kbid, browser_text, is_system
-				printLine(writer, String.valueOf(classId), classIRI.getFragment(),
+				printLine(writer, String.valueOf(classId), fragment,
 						(ns == null ? null : String.valueOf(ns.getId())),
 						String.valueOf(kbid), browserText,
 						String.valueOf(cls.isBuiltIn()));
@@ -388,10 +421,10 @@ public class OwlLoader {
 	 * @throws UnsupportedEncodingException
 	 */
 	private void fillEntityMappings(OWLOntologyManager manager,
-			OWLOntology topOntology) throws OntoquestException,
+			OWLOntology topOntology, KnowledgeBase kb) throws OntoquestException,
 			UnsupportedEncodingException, FileNotFoundException {
 		// processing prefix (namespace) mapping
-		fillPrefixMapping(manager);
+		fillPrefixMapping(manager, kb);
 
 		// processing ontology entity
 		fillOntologyMap(manager, topOntology);
@@ -430,8 +463,14 @@ public class OwlLoader {
 
 				int entityId = idCounter.increment();
 				IRI entityIRI = entity.getIRI();
+        String prefix = entityIRI.getNamespace();
+        String fragment = entityIRI.getFragment();
+        if ( fragment == null) 
+        {
+          this.log.warn( "NULL fragment found for IRI:" + entityIRI.toString() );
+        }
 				// save the entry in BDB.
-				NamespaceEntity ns = prefixIDMap.get(entityIRI.getStart());
+				NamespaceEntity ns = prefixIDMap.get(prefix);
 				String browserText = composeBrowserText(entityIRI, ns);
 
 				node.set(entityIRI.toString(), NodeType.Individual, entityId,
@@ -444,6 +483,7 @@ public class OwlLoader {
 				// }
 
 				// line: id, name, nsid, kbid, browsertext, is_named
+         
 				printLine(writer, String.valueOf(entityId), entityIRI.getFragment(),
 						(ns == null ? null : String.valueOf(ns.getId())),
 						String.valueOf(kbid), browserText, String.valueOf(entity.isNamed()));
@@ -463,6 +503,10 @@ public class OwlLoader {
 				BDBUtil.storeNode(tmpDB, node.getName(), node);
 				// BDBUtil.storeData(tmpDB, entity.getID().getID(), entityId);
 				// System.out.println("Individual: " + entity.getIRI());
+        if ( node.getName() == null) 
+        {
+          this.log.warn( "NULL fragment found for IRI:" + entity.toString() );
+        }
 				printLine(writer, String.valueOf(entityId), node.getName(), null,
 						String.valueOf(kbid), node.getBrowserText(),
 						String.valueOf(entity.isNamed()));
@@ -479,6 +523,7 @@ public class OwlLoader {
 			OWLOntologyFormat format = manager.getOntologyFormat(ontology);
 			String prefix = null;
 			IRI ontIRI = ontology.getOntologyID().getOntologyIRI();
+      IRI ontVerIRI = ontology.getOntologyID().getVersionIRI();
 			if (format.isPrefixOWLOntologyFormat()) {
 				PrefixOWLOntologyFormat prefixOntFormat = (PrefixOWLOntologyFormat) format;
 				prefix = prefixOntFormat.getDefaultPrefix();
@@ -491,15 +536,17 @@ public class OwlLoader {
 			OntologyEntity o = new OntologyEntity(ontologyCounter.increment(), 
 					ontIRI, ns, kbid, isDefault, 
 					(ontIRI == null) ? null
-							: ontIRI.toString(), manager.getOntologyDocumentIRI(ontology));
+							: ontIRI.toString(), manager.getOntologyDocumentIRI(ontology),
+          ontVerIRI);
 			ontologyMap.put(ontology, o);
 		}
 	}
 
-	private void fillPrefixMapping(OWLOntologyManager manager) throws OntoquestException {
+	private void fillPrefixMapping(OWLOntologyManager manager, KnowledgeBase kb) throws OntoquestException {
 		IdCounter nsCounter = getCounter("sequence.namespace");
 		Set<OWLOntology> ontologies = manager.getOntologies();
 		for (OWLOntology ontology : ontologies) {
+  //    String ontURI = ontology.getOntologyID().getOntologyIRI().toString();
 			OWLOntologyFormat format = manager.getOntologyFormat(ontology);
 			// String ontologyId = getOntologyId(ontology);
 			if (format.isPrefixOWLOntologyFormat()) {
@@ -507,17 +554,26 @@ public class OwlLoader {
 				Set<String> prefixNames = prefixOntFormat.getPrefixNames();
 				for (String prefixName : prefixNames) {
 					String uri = prefixOntFormat.getPrefix(prefixName);
-					NamespaceEntity ns = new NamespaceEntity(nsCounter.increment(), prefixName, uri, kbid, ontology);
+          int id = kb.getPrefixId(uri);
+          if (id == -1) {
+             id = nsCounter.increment();
+             kb.addPrefix(uri, id);
+          }
+					NamespaceEntity ns = new NamespaceEntity(nsCounter.increment(), prefixName, uri,kb.getKBId(), ontology, id);
 					// String key = ontologyId + "|" + uri;
-					prefixIDMap.put(uri, ns);
+					NamespaceEntity pr = prefixIDMap.put(uri, ns);
+          if ( pr !=null && (prefixName.equals(pr.getPrefix()))) 
+    //        System.out.println ("duplicate namespace definition for  " + uri + " between " +
+    //                          pr.getPrefix() + " and " + prefixName );
 					log.debug("Namespace -- " + uri + " -- " + ns.getPrefix()
 							+ ns.getUri());
 				}
 			}
 		}
 	}
+  
 	private void fillProperty(OWLEntity entity, Database tmpDB, int entityId,
-			OWLOntology ontology, String ontologyId, PrintWriter writer)
+			OWLOntology ontology, PrintWriter writer)
 					throws UnsupportedEncodingException {
 		if (BDBUtil.containsNode(tmpDB, entity.getIRI().toString()))
 			return;
@@ -525,7 +581,7 @@ public class OwlLoader {
 		IRI entityIRI = entity.getIRI();
 		NamespaceEntity ns = prefixIDMap.get(entityIRI.getStart());
 		String browserText = composeBrowserText(entityIRI, ns);
-		// String browserText = entityIRI.toString();
+ 		// String browserText = entityIRI.toString();
 		// if (ns != null) {
 		// browserText = ":".equals(ns.getPrefix()) ? entityIRI.getFragment() : ns
 		// .getPrefix() + entityIRI.getFragment();
@@ -576,7 +632,7 @@ public class OwlLoader {
 					.getAnnotationPropertiesInSignature();
 			for (OWLAnnotationProperty entity : entities) {
 				fillProperty(entity, tmpPropertyDB, idCounter.increment(), ontology,
-						ontologyId, writer);
+						/*ontologyId,*/ writer);
 			}
 
 			log.debug("Processing object properties in ontology " + ontologyId);
@@ -584,14 +640,14 @@ public class OwlLoader {
 					.getObjectPropertiesInSignature();
 			for (OWLObjectProperty entity : entities2) {
 				fillProperty(entity, tmpPropertyDB, idCounter.increment(), ontology,
-						ontologyId, writer);
+						/*ontologyId,*/ writer);
 			}
 
 			log.debug("Processing data properties in ontology " + ontologyId);
 			Set<OWLDataProperty> entities3 = ontology.getDataPropertiesInSignature();
 			for (OWLDataProperty entity : entities3) {
 				fillProperty(entity, tmpPropertyDB, idCounter.increment(), ontology,
-						ontologyId, writer);
+					/*	ontologyId,*/ writer);
 			}
 		}
 	}
@@ -912,22 +968,6 @@ public class OwlLoader {
           
         }
     }
-
-    Set<OWLEquivalentDataPropertiesAxiom> axioms2 = ontology
-        .getAxioms(AxiomType.EQUIVALENT_DATA_PROPERTIES);
-    for (OWLEquivalentDataPropertiesAxiom axiom : axioms2) {
-      Set<OWLDataPropertyExpression> properties = axiom.getProperties();
-      if (properties == null || properties.size() != 2)
-        throw new OntoquestException(
-            "Incorrect number of properties in equivalent object property "
-                + axiom);
-
-      Iterator<OWLDataPropertyExpression> it = properties.iterator();
-      OWLDataPropertyExpression p1 = it.next();
-      OWLDataPropertyExpression p2 = it.next();
-      saveEquivalentPropertyOfAxiom(p1, p2, ontologyId);
-    }
-
   }
 
 
@@ -1224,7 +1264,7 @@ public class OwlLoader {
 
 			// clean the knowledge base if it exists in the database
 			// cleanKB(con);
-			classCache.clear();
+		//	classCache.clear();
 
 			// initialization
 			initCounterMap();
@@ -1232,8 +1272,9 @@ public class OwlLoader {
 			// set kbid
 			kbid = getCounter("sequence.kb").increment();
 
+      KnowledgeBase kb = new KnowledgeBase (kbid, counterMap);
 			// printSignature(ontology);
-			fillEntityMappings(manager, ontology);
+			fillEntityMappings(manager, ontology, kb);
 
 			// process axioms
 			processAxioms(manager);
@@ -2011,9 +2052,15 @@ public class OwlLoader {
 	}
 
 	private void storeOntologies(Connection con)
-			throws SQLException {
-		String sql = "insert into ontologyuri values(?,?,?,?,?,?,?)";
+			throws SQLException, OntoquestException
+  {
+	  // use this when the inserting from stream works correctly.
+ 		String sql = "insert into ontologyuri (id, uri, is_default, nsid, kbid, browsertext,document_uri, owl_file_length, owl_content, version_iri) values(?,?,?,?,?,?,?,?,?,?)";
+ //  String sql = "insert into ontologyuri (id, uri, is_default, nsid, kbid, browsertext,document_uri) values(?,?,?,?,?,?,?)";
 		PreparedStatement stmt = con.prepareStatement(sql);
+    int bufLen = 80000;
+    CharBuffer buffer = CharBuffer.allocate(bufLen);
+    
 		for (OntologyEntity entity : ontologyMap.values()) {
 			stmt.clearParameters();
 			stmt.setInt(1, entity.getId());
@@ -2025,12 +2072,55 @@ public class OwlLoader {
 				stmt.setInt(4, entity.getNamespace().getId());
 			stmt.setInt(5, entity.getKbid());
 			stmt.setString(6, entity.getBrowserText());
-			IRI documentIRI = entity.getDocumentIRI();
-			if (documentIRI == null)
+			
+      IRI documentIRI = entity.getDocumentIRI();
+      if (documentIRI == null) {
 				stmt.setNull(7, java.sql.Types.VARCHAR);
+        stmt.close();
+        throw new OntoquestException ("Document URL for ontology " + 
+                             entity.getIri().toString() + " is empty"); 
+      } 
 			else
 				stmt.setString(7, entity.getDocumentIRI().toString());
-			stmt.execute();
+      
+      // set versionIRI
+      if (entity.getVersionIRI() == null ){
+        stmt.setNull(10, java.sql.Types.VARCHAR);
+      } else 
+        stmt.setString(10, entity.getVersionIRI().toString());
+        
+      try { 
+        URL u = documentIRI.toURI().toURL();
+        InputStream is =  u.openStream();
+        String tmpOntologyFileName = this.tmpDirName + "/tmp_downloaded.owl";
+        FileOutputStream fout = new FileOutputStream(tmpOntologyFileName);
+        
+        byte data[] = new byte[102400];
+        int count = 0;
+        int total=0;
+        while (true)
+        {
+          count = is.read(data, 0, 102400);
+          if (count == -1)
+            break;
+          
+          fout.write(data, 0, count);
+          total += count;
+        }
+        is.close();
+        fout.close();
+
+        stmt.setInt(8, total);
+        Reader ir = new FileReader(tmpOntologyFileName);
+        stmt.setCharacterStream(9, ir, total);
+          
+        stmt.execute();
+        is.close();
+       } catch (IOException e) 
+      {
+        stmt.close();
+        throw new OntoquestException ("IO error occurred when downloading file "+ documentIRI.toString()); 
+      }  // */
 		}
 		stmt.close();
 	}
