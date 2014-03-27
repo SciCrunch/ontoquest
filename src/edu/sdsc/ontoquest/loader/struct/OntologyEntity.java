@@ -9,11 +9,12 @@ public class OntologyEntity {
 	private boolean isDefault = false;
 	private NamespaceEntity namespace = null;
 	private int kbid; 
-	private String browserText;
+	private String browserText;  // this field is the same as IRI in db. The loader uses iri.toString() to populate this field.
 	private IRI documentIRI;
+  private IRI versionIRI;
 	
 	public OntologyEntity(int id, IRI iri, NamespaceEntity namespace, int kbid, 
-			boolean isDefault, String browserText, IRI documentIRI) {
+			boolean isDefault, String browserText, IRI documentIRI, IRI versionIRI) {
 		this.id = id;
 		this.iri = iri;
 		this.namespace = namespace;
@@ -21,6 +22,7 @@ public class OntologyEntity {
 		this.isDefault = isDefault;
 		this.browserText = browserText;
 		this.documentIRI = documentIRI;
+    this.versionIRI = versionIRI;
 	}
 
 	public int getId() {
@@ -78,4 +80,11 @@ public class OntologyEntity {
 	public void setDocumentIRI(IRI documentIRI) {
 		this.documentIRI = documentIRI;
 	}
+  
+  public void setVersionIRI(IRI versioniri) 
+  {
+     this.versionIRI = versioniri;
+  }
+  
+  public IRI getVersionIRI () {return this.versionIRI;}
 }
