@@ -136,9 +136,10 @@ public abstract class BaseBean {
 	private static synchronized void setSynonymPropertySet() {
 		synonymPropertySet = new HashSet<String>();
 	  synonymPropertySet.add("synonym"); 
-		synonymPropertySet.add("has_exact_synonym"); 
 		synonymPropertySet.add("abbrev");
+	  synonymPropertySet.add("has_exact_synonym"); 
 		synonymPropertySet.add("hasExactSynonym"); 
+	  synonymPropertySet.add("has_related_synonym"); 
 		synonymPropertySet.add("hasRelatedSynonym"); 
 		synonymPropertySet.add("acronym"); 
 		synonymPropertySet.add("altLabel"); 
@@ -153,6 +154,7 @@ public abstract class BaseBean {
 		synonymPropertySet.add("misspelling"); 
 		synonymPropertySet.add("misnomer"); 
 		synonymPropertySet.add("hasBroadSynonym"); 
+	  synonymPropertySet.add("has_broad_synonym"); 
 	}
 
 	//  public static HashSet<String> getExternalSourcePropertySet() {
