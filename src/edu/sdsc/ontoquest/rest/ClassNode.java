@@ -26,6 +26,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.TreeMap;
 
@@ -135,7 +136,7 @@ public class ClassNode extends BasicClassNode {
 				//        String nifID = nameMap.get(generateId(rid, rtid));
 				//        if (nifID == null) 
 				//          nifID = getBasicFunctions().getName(rtid, rid, context);
-				node = new ClassNode(compositeID, null, term, new LinkedList<String>(), new LinkedList<String>(), null);
+				node = new ClassNode(compositeID, null, term, new LinkedList<String>(), new LinkedList<AbstractMap.SimpleEntry<String,String>>(), null);
 				nodeIDList.add(new int[]{rid, rtid});
 			}
 
@@ -148,7 +149,7 @@ public class ClassNode extends BasicClassNode {
 				if (!useLabel)
 					node.setLabel(rs.getString(6));
 			} else if (getSynonymPropertySet().contains(prop)){ // synonym edge
-				List<String> existingSynonyms = node.getSynonyms();
+				List<String> existingSynonyms = node.getSynonymStrings();
 				String lowerVal = val.toLowerCase();
 				// check if the synonym has appeared 
 				if (val.equals(node.getLabel()))
@@ -404,7 +405,7 @@ public class ClassNode extends BasicClassNode {
 //	private String url; // ontology url  removed to use uri of the parent class
 
 	private List<String> comments;
-	private List<String> synonyms;
+	private List<AbstractMap.SimpleEntry<String,String>> synonyms;
 	private List<String[]> otherProperties; // String[0] -- property name,
 	// String[1] -- property value
 	private List<SimpleClassNode> superclasses = new LinkedList<SimpleClassNode>(); // xufei,
@@ -444,14 +445,15 @@ public class ClassNode extends BasicClassNode {
 		return get(ontoIDs, context);
 	}
 
-	public static HashMap<String, ClassNode> getByLabel(String term, int kbId,
+/*
+  private static HashMap<String, ClassNode> getByLabel(String term, int kbId,
 			Context context) throws OntoquestException {
 		String[] terms = term.split(";");
 		return getByLabel(terms, kbId, context);
 
 	}
 
-	public static HashMap<String, ClassNode> getByLabel(String[] terms, int kbId,
+	private static HashMap<String, ClassNode> getByLabel(String[] terms, int kbId,
 			Context context) throws OntoquestException {
     /* include all properties, no exclude properties. Include synonyms. 
      * only outgoing edges, exclude hidden edges, not just classes, one level deep,
@@ -461,23 +463,25 @@ public class ClassNode extends BasicClassNode {
      * 1. search this term in the name and lable field of graph_node table (case-insensitive search).
      * 2. finde nodes that has this term as synonyms.
      * 3. get out-going properties of the nodes returned from 1 and 2.
-     * */
+     * 
 		OntoquestFunction<ResourceSet> f = new GetNeighbors(terms, kbId,
 				getClassProperties, null, true, GetNeighbors.EDGE_OUTGOING, true,
 				false, 1, false,-1);
 		return getNodeMap(f, true, context);
 	}
-  
+ */ 
+  /*
  	public static HashMap<String, ClassNode> getByName(String name, int kbId,
 			Context context) throws OntoquestException {
 		String[] names = name.split(";");
 		OntoquestFunction<ResourceSet> f = new GetNeighbors(names, kbId, true, getClassProperties, null,
 				GetNeighbors.EDGE_OUTGOING, true, false, 1, false);
 		return getNodeMap(f, false, context);
-	}
+	} 
+   */
 
 	public ClassNode(String id, String name, String label, List<String> comments, 
-			List<String> synonyms,String definition) throws OntoquestException {
+			List<AbstractMap.SimpleEntry<String,String>> synonyms,String definition) throws OntoquestException {
 		setId(id);
 		setLabel(label);
 		setName(name);
@@ -498,7 +502,7 @@ public class ClassNode extends BasicClassNode {
     super(rid,1);
 
     this.comments = new ArrayList<String>(5);
-    this.synonyms = new ArrayList<String>(5);
+    this.synonyms = new ArrayList<AbstractMap.SimpleEntry<String,String>>(5);
     this.otherProperties = new ArrayList<String[]> (20);
     this.superclasses = new ArrayList<SimpleClassNode> (5);
     
@@ -558,7 +562,7 @@ public class ClassNode extends BasicClassNode {
       } else if ( isDefinitionProperty(prop) ) {
          setDefinition(val);
       } else if (getSynonymPropertySet().contains(prop)){ // synonym edge
-          synonyms.add(val);
+          synonyms.add(new AbstractMap.SimpleEntry<String,String>(prop,val));
       } else if (rs.getInt(5) == 13) { // other properties, 13 means literal.
         otherProperties.add(new String[]{prop, val});
       }
@@ -617,7 +621,7 @@ public class ClassNode extends BasicClassNode {
     setRtid (1);
 
     this.comments = new ArrayList<String>(5);
-    this.synonyms = new ArrayList<String>(5);
+    this.synonyms = new ArrayList<AbstractMap.SimpleEntry<String,String>>(5);
     this.otherProperties = new ArrayList<String[]> (20);
     this.superclasses = new ArrayList<SimpleClassNode> (5);
   
@@ -661,8 +665,12 @@ public class ClassNode extends BasicClassNode {
 	/**
 	 * @return the synonyms
 	 */
-	public List<String> getSynonyms() {
-		return synonyms;
+	public List<String> getSynonymStrings() {
+    List<String> result = new ArrayList<String>(synonyms.size());
+    for ( AbstractMap.SimpleEntry<String,String> e: synonyms ) {
+      result.add(e.getValue());
+    }
+		return result;
 	}
 
 	/**
@@ -710,7 +718,7 @@ public class ClassNode extends BasicClassNode {
 	/**
 	 * @param synonyms the synonyms to set
 	 */
-	public void setSynonyms(List<String> synonyms) {
+	public void setSynonyms(List<AbstractMap.SimpleEntry<String,String>> synonyms) {
 		this.synonyms = synonyms;
 	}
 
@@ -763,9 +771,11 @@ public class ClassNode extends BasicClassNode {
 		if (!Utility.isBlank(synonyms)) {
 			Element synonymsElem = doc.createElement("synonyms");
 			e.appendChild(synonymsElem);
-			for (String synonym : synonyms) {
+	//		for (String synonym : synonyms) {
+      for (AbstractMap.SimpleEntry<String,String> se : synonyms) {
 				Element synonymElem = doc.createElement("synonym");
-				synonymElem.appendChild(doc.createTextNode(synonym));
+        synonymElem.setAttribute("property", se.getKey());
+				synonymElem.appendChild(doc.createTextNode(se.getValue()));
 				synonymsElem.appendChild(synonymElem);
 			}
 		}
