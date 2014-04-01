@@ -147,7 +147,10 @@ public class ClassNodeResource extends BaseResource {
 		if (classId != null) {
 			classId = Reference.decode(classId);
 			//return ClassNode.getByName(classId, kbId, getOntoquestContext());
-      classNodes = getClassesFromTermID(kbId,classId);
+			if (classId.toLowerCase().startsWith("http://")) 
+			  getClassesFromURI(kbId, classId);
+			else 
+        classNodes = getClassesFromTermID(kbId,classId);
       return classNodes;
 		}
 
@@ -244,7 +247,6 @@ public class ClassNodeResource extends BaseResource {
     varList.add(new Variable(1));
     varList.add(new Variable(1));
 
-    
     ResourceSet r = DbUtility.executeSQLQuery(sql, getOntoquestContext(), varList, null, "Error occured when getting rids of the search term " + term,-1);
     while (r.next()) {
       int rid1 = r.getInt(1);
@@ -279,7 +281,6 @@ public class ClassNodeResource extends BaseResource {
     varList.add(new Variable(1));
     varList.add(new Variable(1));
 
-    
     ResourceSet r = DbUtility.executeSQLQuery(sql, getOntoquestContext(), varList, null, "Error occured when getting rids of the search term ID" + termId,-1);
     while (r.next()) {
       int rid1 = r.getInt(1);
