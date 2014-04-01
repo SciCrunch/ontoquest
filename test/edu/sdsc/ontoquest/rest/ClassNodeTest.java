@@ -36,6 +36,7 @@ public class ClassNodeTest extends OntoquestTestAdapter {
 		}
 	}
 
+/*
 	public void testGetByLabel() throws OntoquestException {
 		String name = "Cerebellum";
 		HashMap<String, ClassNode> classNodes = ClassNode.getByLabel(name, kbId,
@@ -55,7 +56,8 @@ public class ClassNodeTest extends OntoquestTestAdapter {
 			//      assertEquals(c.getName(), name);
 		}    
 	}
-
+*/
+  
 	public void testGetSiblings() throws OntoquestException {
 		HashMap<String, ClassNode> classNodes = null;
 		//    classNodes= ClassNode.getSiblings("Cerebellum", SiblingsType.CLASSES, kbId, 
