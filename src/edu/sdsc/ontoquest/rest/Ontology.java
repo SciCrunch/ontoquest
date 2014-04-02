@@ -109,8 +109,9 @@ public class Ontology extends BaseBean {
     rs = DbUtility.executeSQLQuery(sql, context, varList, null, 
         "Error occured when getting kb info for " + name,-1);
     while (rs.next()) {
+      String iriString = rs.getString(2);
       this.importedOntologies.add(new Ontology(IRI.create(rs.getString(1)),
-                                          IRI.create(rs.getString(2))));
+                                               iriString == null? null :IRI.create(iriString)));
     }
     rs.close();
   }
@@ -133,7 +134,7 @@ public class Ontology extends BaseBean {
       String versionIRI = rs.getString(3);
       int kbid = rs.getInt(4);
       ont =new Ontology(rid, rtid, kbName, context);
-      ont.setVersionIRI( IRI.create(versionIRI));
+      ont.setVersionIRI( versionIRI == null ? null : IRI.create(versionIRI));
       
     }
     rs.close();
@@ -257,10 +258,11 @@ public class Ontology extends BaseBean {
       creatorElem.appendChild(doc.createTextNode(creator));
     }
   */  
+ /*
     if ( versionIRI != null) {
       Element versionIRIElem = doc.createElement("versionIRI");
       e.appendChild(versionIRIElem);
-      versionIRIElem.appendChild(doc.createTextNode(versionIRI.toString()));
+      versionIRIElem.setAttribute("resource", versionIRI.toString());
     }
 
     Element loadingTimeElem = doc.createElement("loadingTime");
@@ -270,7 +272,7 @@ public class Ontology extends BaseBean {
     Element formatElem = doc.createElement("format");
     e.appendChild(formatElem);
     formatElem.appendChild(doc.createTextNode(format));
-
+*/
 /*    
     Element contributorsElem = doc.createElement("contributors");
     e.appendChild(contributorsElem);
@@ -283,14 +285,19 @@ public class Ontology extends BaseBean {
     Element dateElem = doc.createElement("date_created");
     e.appendChild(dateElem);
     dateElem.appendChild(doc.createTextNode(dateCreated));
-*/ 
-    Element importsElem = doc.createElement("imports");
-    e.appendChild(importsElem);
+*/
+  /*  
     for (Ontology imps : this.importedOntologies) {
-      Element contributorElem = doc.createElement("contributor");
-  //    contributorsElem.appendChild(contributorElem);
-  //    contributorElem.appendChild(doc.createTextNode(contributor));
+      Element importElmt = doc.createElement("imports");
+         importElmt.setAttribute("resource", imps.uri.toString());
+      if ( imps.getVersionIRI() != null ) {
+           Element vIRI = doc.createElement("versionIRI");
+           vIRI.setAttribute("resource",imps.getVersionIRI().toString());
+           importElmt.appendChild (vIRI);
+      }
+      e.appendChild (importElmt); 
     }
+*/
     return e;
   }
 
