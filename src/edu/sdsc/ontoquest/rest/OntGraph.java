@@ -349,14 +349,24 @@ public class OntGraph extends BaseBean {
          "from " + edgeTableName + " e, (" + getRidIncludeSynonymSubQuery + ") n0, " +
          "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
          "where n0.rid = e.rid1 and e.rtid1 = 1 and n2.rid = e.rid2 and " +
-         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid " +
+         "union select e.rid2, e.rtid2, gn.label,n2.rid, n2.rtid, n2.label, e.pid , gp.label, gn.name, n2.name, gp.name " + 
+         "from " + edgeTableName + " e, ("+ getRidIncludeSynonymSubQuery + ") n0, " + 
+         "graph_nodes n2, graph_nodes gp, graph_nodes gn, property p " +  
+         "where n0.rid = e.rid2 and e.rtid1 = 1 and n2.rid = e.rid1 and p.id = e.pid and p.is_symmetric=true and " + 
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid" ;
     } else if ( edgeType == GetNeighbors.EDGE_INCOMING) 
     {
       return "select n2.rid, n2.rtid, n2.label, e.rid2, e.rtid2, gn.label, e.pid , gp.label, n2.name, gn.name, gp.name " +
          "from " + edgeTableName + " e, ("+ getRidIncludeSynonymSubQuery + ") n0, " +
          "graph_nodes n2, graph_nodes gp, graph_nodes gn " + 
          "where n0.rid = e.rid2 and e.rtid1 = 1 and n2.rid = e.rid1 and " +
-         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
+         "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid " + 
+         "union select e.rid2, e.rtid2, n2.label,n0.rid, n0.rtid, gn.label, e.pid , gp.label, n2.name, gn.name, gp.name " +
+               "from " + edgeTableName + " e, (" + getRidIncludeSynonymSubQuery + ") n0, " +
+               "graph_nodes n2, graph_nodes gp, graph_nodes gn, property p " + 
+               "where n0.rid = e.rid1 and e.rtid1 = 1 and n2.rid = e.rid2 and p.id = e.pid and p.is_symmetric=true and " +
+               "n2.rtid = 1 and e.rtid2 = 1 and gp.rid = e.pid and gp.rtid = 15 and gn.rid = n0.rid and gn.rtid = n0.rtid ";
   
     } else if ( edgeType == GetNeighbors.EDGE_BOTH ) {
       return 

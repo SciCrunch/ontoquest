@@ -153,7 +153,7 @@ public class OwlLoader {
 
 	private static final String DEFAULT_CONFIG_FILE = "config/ontoquest.xml";
 	private static Log log = LogFactory.getLog(OwlLoader.class);
-
+  
 	public static final Pattern UNWANTED_CHAR = Pattern
 			.compile("[\\p{Space}||[^\\p{ASCII}]]+");
 
@@ -169,7 +169,7 @@ public class OwlLoader {
 		return true;
   
 	}
-
+  
 	public static void main(String[] args) {
     try { 
       Options options = new Options();
@@ -2171,15 +2171,15 @@ public class OwlLoader {
 					+ owlNSID + "," + kbid + ",'owl:cardinality',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'complementOf',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'complementOf',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:comlementOf',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'differentFrom',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'differentFrom',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:differentFrom',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'disjointWith',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'disjointWith',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:disjointWith',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
@@ -2187,11 +2187,11 @@ public class OwlLoader {
 					+ owlNSID + "," + kbid + ",'owl:distinctMembers',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'equivalentClass',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'equivalentClass',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:equivalentClass',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'equivalentProperty',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'equivalentProperty',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:equivalentProperty',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
@@ -2211,7 +2211,7 @@ public class OwlLoader {
 					+ owlNSID + "," + kbid + ",'owl:intersectionOf',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'inverseOf',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'inverseOf',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:inverseOf',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
@@ -2239,7 +2239,7 @@ public class OwlLoader {
 					+ owlNSID + "," + kbid + ",'owl:priorVersion',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()
-					+ ",'sameAs',null,false,false,false,false,false,false,false,false,true,false,"
+					+ ",'sameAs',null,false,false,true,false,false,false,false,false,true,false,"
 					+ owlNSID + "," + kbid + ",'owl:sameAs',false)");
 			stmt.addBatch("insert into property values("
 					+ counter.increment()

@@ -258,7 +258,7 @@ public class Ontology extends BaseBean {
       creatorElem.appendChild(doc.createTextNode(creator));
     }
   */  
- /*
+ 
     if ( versionIRI != null) {
       Element versionIRIElem = doc.createElement("versionIRI");
       e.appendChild(versionIRIElem);
@@ -272,7 +272,7 @@ public class Ontology extends BaseBean {
     Element formatElem = doc.createElement("format");
     e.appendChild(formatElem);
     formatElem.appendChild(doc.createTextNode(format));
-*/
+
 /*    
     Element contributorsElem = doc.createElement("contributors");
     e.appendChild(contributorsElem);
@@ -286,7 +286,7 @@ public class Ontology extends BaseBean {
     e.appendChild(dateElem);
     dateElem.appendChild(doc.createTextNode(dateCreated));
 */
-  /*  
+    
     for (Ontology imps : this.importedOntologies) {
       Element importElmt = doc.createElement("imports");
          importElmt.setAttribute("resource", imps.uri.toString());
@@ -297,7 +297,7 @@ public class Ontology extends BaseBean {
       }
       e.appendChild (importElmt); 
     }
-*/
+
     return e;
   }
 
