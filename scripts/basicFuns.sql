@@ -172,7 +172,6 @@ CREATE OR REPLACE FUNCTION compose_pid_condition(pidList INTEGER[], include_subp
 $$ LANGUAGE plpgsql;
 
 -- DROP FUNCTION get_neighborhood(integer[], integer[], integer[], boolean, integer, boolean, boolean, boolean, boolean);
-
 CREATE OR REPLACE FUNCTION get_neighborhood(idlist integer[], pidlist integer[], excludedpidlist integer[], preflabel boolean, maxhops integer, no_hidden boolean, include_subproperties boolean, class_only boolean, dir_incoming boolean)
   RETURNS SETOF edge2 AS
 $BODY$
@@ -222,10 +221,10 @@ $BODY$
       end if;
 
       if current_rid is null then
-           raise notice 'use the original rid %',idList[curIdx][1];  
+--           raise notice 'use the original rid %',idList[curIdx][1];  
            current_rid := idList[curIdx][1];
-      else 
-         raise notice 'use the equivalent class rid %',current_rid;  
+--      else 
+--         raise notice 'use the equivalent class rid %',current_rid;  
       end if;
 
      if neighbors is null then
@@ -303,7 +302,7 @@ $BODY$
           'FROM graph_edges r WHERE r.rid1 = '||neighbors[curIdx][1]||' and r.rtid1 = '||neighbors[curIdx][2]|| 
           ' and (r.rid1 != r.rid2 OR r.rtid1 != r.rtid2) '|| pid_condition||hidden_condition; 
       END IF;
---raise notice 'sql = %', sql;
+ -- raise notice 'sql = %', sql;
       -- exit when there is no more elements in neighbors list or we have reached the maxHops level.
       FOR rec IN EXECUTE sql LOOP      
         IF dir_incoming THEN
@@ -338,6 +337,7 @@ $BODY$
   LANGUAGE plpgsql VOLATILE
   COST 100
   ROWS 1000;
+
 
 
 CREATE OR REPLACE FUNCTION get_neighborhood(rid INTEGER, rtid INTEGER, pid INTEGER, prefLabel boolean, 
