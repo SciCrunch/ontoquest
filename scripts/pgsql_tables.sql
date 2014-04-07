@@ -905,7 +905,8 @@ CREATE TABLE equivalentclassgroup
       ON UPDATE NO ACTION ON DELETE NO ACTION,
   CONSTRAINT equivalentclassgroup_ridm_fkey FOREIGN KEY (ridm)
       REFERENCES primitiveclass (id) MATCH SIMPLE
-      ON UPDATE NO ACTION ON DELETE NO ACTION
+      ON UPDATE NO ACTION ON DELETE NO ACTION,
+  CONSTRAINT equivalentclassgroup_ridm_key UNIQUE (ridm)
 );
 
 
@@ -1095,9 +1096,10 @@ values
  ('prefLabel'),
  ('label'),
   ('has_exact_synonym'),
+  ('hasExactSynonym'), 
   ('synonym'), 
   ('abbrev'), 
-  ( 'hasExactSynonym'), 
+  ('has_related_synonym'), 
   ('hasRelatedSynonym'), 
   ('acronym'),
   ( 'taxonomicCommonName'), 
@@ -1106,7 +1108,9 @@ values
   ('ncbiTaxBlastName'),
   ('ncbiIncludesName'), 
   ('ncbiInPartName'), 
+  ('has_narrow_synonym'), 
   ('hasNarrowSynonym'), 
   ('misspelling'), 
   ('misnomer'),
+  ('has_broad_synonym'),
   ( 'hasBroadSynonym');
