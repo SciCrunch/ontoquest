@@ -1,5 +1,7 @@
 package edu.sdsc.ontoquest.rest;
 
+import edu.sdsc.ontoquest.Context;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -19,23 +21,32 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 
 import edu.sdsc.ontoquest.OntoquestException;
+import edu.sdsc.ontoquest.ResourceSet;
+import edu.sdsc.ontoquest.db.DbUtility;
 import edu.sdsc.ontoquest.query.Utility;
+
+import edu.sdsc.ontoquest.query.Variable;
+
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * @version $Id: OntologiesResource.java,v 1.1 2010-10-28 06:29:57 xqian Exp $
  *
  */
 public class OntologiesResource extends BaseResource {
-  private enum QueryType {DOWNLOAD_ONE, LIST_ALL, LIST_ONE }
+  private enum QueryType {DOWNLOAD_ONE, LIST_ALL, LIST_ONE, GET_CATEGORIES }
   
   List<Ontology> ontologies = new LinkedList<Ontology>();
   String selectedOntURL = null;
   QueryType queryType = QueryType.LIST_ALL;
+  Set<String> categories = new TreeSet<String>(); 
   
   @Override
   protected void doInit() throws ResourceException {
     try {
-      OntoquestApplication application = (OntoquestApplication)getApplication();
+    //  OntoquestApplication application = (OntoquestApplication)getApplication();
       
       String type = (String) getRequest().getAttributes().get("type");
       if (Utility.isBlank(type)) {
@@ -54,6 +65,9 @@ public class OntologiesResource extends BaseResource {
         selectedOntURL = Ontology.getURI(kbName, getOntoquestContext());
         if (Utility.isBlank(selectedOntURL))
           throw new OntoquestException(OntoquestException.Type.INPUT, "Ontology not found -- " + kbName);
+      } if (type.equalsIgnoreCase("categories")) {
+        queryType = QueryType.GET_CATEGORIES;
+        categories = this.getCategories( getOntoquestContext(), kbName);
       } else { // default: list all ontologies
         queryType = QueryType.LIST_ONE;
         Ontology ont = Ontology.get(kbName, getOntoquestContext());
@@ -72,6 +86,10 @@ public class OntologiesResource extends BaseResource {
       return toErrorXml();
     if (queryType == QueryType.DOWNLOAD_ONE) {
       return downloadOntology();
+    }
+    if ( queryType == QueryType.GET_CATEGORIES) 
+    {
+      return returnCategories();
     }
     
     try {
@@ -101,7 +119,7 @@ public class OntologiesResource extends BaseResource {
     }
   }
   
-  public Representation downloadOntology() {
+  private Representation downloadOntology() {
     try {
       StringBuilder sb = new StringBuilder();
       URL owlURL = new URL(selectedOntURL);
@@ -120,5 +138,49 @@ public class OntologiesResource extends BaseResource {
       return toErrorXml();
     }
   }
+
+  private Set<String> getCategories(Context context, String kbName) throws OntoquestException
+  {
+    List<Variable> varList = new ArrayList<Variable>(1);
+    varList.add(new Variable(1));
+
+    ResourceSet  r = DbUtility.executeSQLQuery("select distinct label from top_categories t, kb k where k.id = t.kbid and label is not null and k.name = '"
+                    + kbName + "'",
+              context,varList, null, "Failed to get category list for ontology " + kbName,-1);
+    
+    Set<String> s = new TreeSet <String> ();
+    while (r.next()) {
+      s.add(r.getString(1));
+    }
+    r.close();
+    return s;
+  }
+
+  private Representation returnCategories() {
+    try {
+      DomRepresentation representation = new DomRepresentation(
+              MediaType.TEXT_XML);
+      Document d = representation.getDocument();
+      Element succElem = d.createElement("success");
+      d.appendChild(succElem);
+      Element dataElem = d.createElement("data");
+      succElem.appendChild(dataElem);
+
+      for (String s : categories) {
+        Element e = d.createElement("category");
+        e.appendChild(d.createTextNode(s));
+        dataElem.appendChild(e);
+      }
+
+      d.normalizeDocument();
+
+      return representation;
+    } catch (Throwable e) {
+      e.printStackTrace();
+      setAppException(e);
+      return toErrorXml();
+    }
+  }
+
 
 }
