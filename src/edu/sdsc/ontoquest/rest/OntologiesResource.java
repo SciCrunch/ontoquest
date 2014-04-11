@@ -57,7 +57,8 @@ public class OntologiesResource extends BaseResource {
       } else { // default: list all ontologies
         queryType = QueryType.LIST_ONE;
         Ontology ont = Ontology.get(kbName, getOntoquestContext());
-        ontologies.add(ont);
+        if ( ont != null )
+          ontologies.add(ont);
       }
     } catch (Throwable oe) {
       setAppException(oe);

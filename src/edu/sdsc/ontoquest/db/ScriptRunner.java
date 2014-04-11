@@ -113,6 +113,9 @@ public class ScriptRunner {
 	// Properties dbProperties = null;
 	private Configuration config = null;
 
+  public static final String suffixOld = "_old";
+  public static final String suffixTmp = "_tmp";
+
 	// //!!!!!!! IMPORTANT! TO USE ONE CONNECTION TO EXECUTE ALL STATEMENTS!
 	private Connection con = null;
 
@@ -151,7 +154,7 @@ public class ScriptRunner {
 			HashMap<String, String> inputRow = new HashMap<String, String>();
 			inputRow.put(":ontName", this.ontName);
 			inputRow.put(":finalName", this.finalOntName);
-			inputRow.put(":oldName", this.finalOntName + "_old");
+			inputRow.put(":oldName", this.finalOntName + suffixOld);
 
 			File schemaFile = AllConfiguration.getFile(scriptName);
 			if (log.isInfoEnabled()) {
@@ -204,6 +207,6 @@ public class ScriptRunner {
 		}
 
 		this.finalOntName = ontNameTmp;
-		this.ontName = (ontNameTmp + "_tmp");
+		this.ontName = (ontNameTmp + suffixTmp);
 	}
 }

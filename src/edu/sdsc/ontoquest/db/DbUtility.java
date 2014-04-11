@@ -271,7 +271,7 @@ public class DbUtility {
 		return str1;
 	}
 
-	protected static boolean runSqlCommand(String stmtStr, 
+	public static boolean runSqlCommand(String stmtStr, 
 			List inputRow, Connection con) throws SQLException {
 		//	    Connection con = conPool.getConnection();
 		PreparedStatement pstmt = null;
@@ -282,6 +282,8 @@ public class DbUtility {
 					pstmt.setObject(i+1, inputRow.get(i));
 				}
 			}
+		  if (logger.isDebugEnabled())
+		    logger.debug(stmtStr);
 			return pstmt.execute();
 
 		} finally {

@@ -254,29 +254,45 @@ public class OwlLoader {
 		//TODO
 	}
 */
-	/**
-	 * delete the ontology in the database if it exists.
-	 * 
-	 * @return true if the ontology is deleted. false if it does not exist, or
-	 *         the deletion is failed.
-	 * @throws SQLException
-	 * @throws ConfigurationException
-	 * @throws OntoquestException
-	 */
-/*	private boolean cleanKB(Connection con) throws SQLException,
+
+  /**
+   *  Delete the ontology in the database if it exists. This function delete all
+   *  content that stored in different tables in the database, not just the entry
+   *  in the kb table.
+   *  
+   * @param con A reference to the database connection. The connection is not closed after
+   *    the function returns.
+   * @throws SQLException
+   * @throws ConfigurationException
+   * @throws OntoquestException
+   */
+	private void cleanKB(Connection con) throws SQLException,
 	ConfigurationException, OntoquestException {
 		con.commit();
-		String sql = AllConfiguration.getConfig().getString(
+    
+	  String ontName = AllConfiguration.getConfig().getString("ontology_name");
+    
+    // clean up old kb to avoid duplicate names in db.
+    DbUtility.runSqlCommand("select delete_kb_complete(id) from kb where kb.name = '" 
+                             + ontName+ ScriptRunner.suffixOld + "'"  ,null, con);
+
+    // cleam up possible left over data from failed load etc. This doesn't sovle
+    // the problem if there are on cocurrent loading jobs with same kb name, this
+    // situation can really cause problems for the loading program. 
+	  DbUtility.runSqlCommand("select delete_kb_complete(id) from kb where kb.name = '" 
+	                           + ontName+ ScriptRunner.suffixTmp + "'"  ,null, con);
+    
+/*		String sql = AllConfiguration.getConfig().getString(
 				"query.getKbIDByName");
 		List<Object> inputRow = new ArrayList<Object>(1);
 		inputRow.add(ontName);
 		boolean result = DbUtility.executeSQLCommandName("cmd.delete_kb",
 				context, new String[] { ontName },
-				"Unable to delete ontology -- " + ontName);
+				"Unable to delete ontology -- " + ontName); */
 		// con.commit();
-		return result;
+		// return result;
 	}
-*/
+
 	private String composeBrowserText(IRI entityIRI, NamespaceEntity ns) {
 		String browserText = entityIRI.toString();
 		if (ns != null) {
@@ -1263,7 +1279,7 @@ public class OwlLoader {
 			}
 
 			// clean the knowledge base if it exists in the database
-			// cleanKB(con);
+			 cleanKB(con);
 		//	classCache.clear();
 
 			// initialization
